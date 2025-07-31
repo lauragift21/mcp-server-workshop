@@ -1,60 +1,69 @@
-# Build and Deploy Remote MCP Servers with Cloudflare
+# 🚀 Build and Deploy Remote MCP Servers with Cloudflare
 
-Welcome to the hands-on workshop for building Model Context Protocol (MCP) servers using Cloudflare Workers! 🚀
+Welcome to the hands-on workshop where you'll build and deploy Model Context Protocol (MCP) servers using **Cloudflare Workers**.
 
-## What You'll Build
+## 🧠 What You'll Build
 
-In this workshop, you'll create your own MCP server that can be used with Claude and other AI applications. You'll learn to deploy it globally using Cloudflare Workers and connect it to Claude for real-world usage.
-
-## 📋 Table of Contents
-
-### 📚 Instructions
-- [**Overview**](./instructions/overview.md) - Workshop agenda, goals, and MCP introduction
-- [**Getting Started**](./instructions/getting-started.md) - Environment setup and prerequisites
-- [**Deploying Your MCP**](./instructions/deploying-your-mcp.md) - Step-by-step deployment guide
-- [**Connect to Claude**](./instructions/connect-to-claude.md) - Configure Claude to use your MCP server
-- [**Building a UI**](./instructions/building-a-ui.md) - *(Optional)* Create a web interface with Cloudflare Pages
-- [**Submission**](./instructions/submission.md) - How to submit your project
-
-### 🎯 Use Cases & Examples
-- [**Travel Planner**](./use-cases/travel-planner/) - MCP server for travel planning and recommendations
-- [**Restaurant Reservation**](./use-cases/restaurant-reservation/) - Restaurant booking and management system
-- [**Meeting Summary**](./use-cases/meeting-summary/) - AI-powered meeting notes and action items
-
-
-<!-- ### 🎯 Use Cases & Examples
-- [**Travel Planner**](./use-cases/travel-planner/) - MCP server for travel planning and recommendations
-- [**Restaurant Reservation**](./use-cases/restaurant-reservation/) - Restaurant booking and management system
-- [**Meeting Summary**](./use-cases/meeting-summary/) - AI-powered meeting notes and action items -->
-
-## 🚀 Quick Start
-
-1. **Prerequisites**: Make sure you have Node.js (v18+) and a Cloudflare account
-2. **Follow a Path**: We'll vote for one of the use cases or build your own idea
-3. **Follow the Instructions**: Start with [Overview](./instructions/overview.md) then [Getting Started](./instructions/getting-started.md)
-4. **Deploy & Test**: Use our deployment guide to get your MCP server live
-5. **Connect to Claude**: Configure Claude to use your new MCP server
-
-## 🏆 Workshop Goals
-
-By the end of this workshop, you'll have:
-- ✅ A working MCP server deployed on Cloudflare Workers
-- ✅ Understanding of the Model Context Protocol
-- ✅ Claude configured to use your custom MCP server
-- ✅ A real-world use case implementation
-
-## 🤝 Getting Help
-
-- **Stuck?** Check the troubleshooting sections in each guide
-- **Questions?** Ask the workshop facilitators
-- **Want to share?** Use the submission guide to showcase your work
-
-## 📄 License
-
-This workshop content is open source and available under the MIT License.
+You'll create your own MCP server that connects to Claude (or any MCP-compatible client) and deploy it globally using Cloudflare. By the end, you'll have a real-world, AI-integrated use case running in production!
 
 ---
 
-**Ready to build amazing MCP servers? Let's get started! 🎉**
+## 📋 Table of Contents
 
-👉 **[Start with the Overview →](./instructions/overview.md)**
+### 🛠 Instructions
+- [Overview](./instructions/overview.md) – Workshop agenda, goals, and intro to MCP
+- [Getting Started](./instructions/getting-started.md) – Prerequisites and environment setup
+- [Deploying Your MCP](./instructions/deploying-your-mcp.md) – Step-by-step deployment guide
+- [Connect to Claude](./instructions/connect-to-claude.md) – Configure Claude to call your MCP server
+- [Building a UI](./instructions/building-a-ui.md) – *(Optional)* Build a web UI using Cloudflare Pages
+- [Submission](./instructions/submission.md) – Submit your project to win prizes 🎁
+
+---
+
+## 💡 Use Cases
+
+We'll vote and build **one live** during the workshop—but you can explore and finish any of these on your own:
+
+- ✈️ [**Travel Planner**](./use-cases/travel-planner/) – Claude integrates with your calendar & travel APIs to plan trips
+- 🍽 [**Restaurant Reservation**](./use-cases/restaurant-reservation/) – Claude connects to a booking platform like OpenTable
+- 📝 [**Meeting Summary**](./use-cases/meeting-summary/) – Claude summarizes notes and creates Jira tasks from Google Docs
+
+---
+
+## 🚀 Quick Start
+
+1. ✅ Make sure you have **Node.js (v18+)** and a **Cloudflare account**
+2. 🛠 Follow the [Getting Started](./instructions/getting-started.md) guide
+3. 🌐 Choose a use case or build your own idea
+4. 🚢 Deploy your MCP server using `wrangler`
+5. 🤖 [Connect to Claude](./instructions/connect-to-claude.md) and test your setup
+
+---
+
+## 🎯 Workshop Goals
+
+By the end of this workshop, you'll have:
+- ✅ A deployed MCP server on Cloudflare Workers
+- ✅ Integrated Claude with your own tools
+- ✅ A real-world use case (like travel planning or meeting automation)
+- ✅ Skills to build & extend MCP-based workflows on your own
+
+---
+
+## 💬 Need Help?
+
+- 📌 Each guide includes troubleshooting tips
+- 🧑‍🏫 Ask mentors during the workshop
+- 🚀 Ready to show off? [Submit your project](./instructions/submission.md)
+
+---
+
+## 📄 License
+
+This workshop is open-source under the MIT License.
+
+---
+
+**Let’s build something powerful together.**
+
+👉 [**Start with the Overview →**](./instructions/overview.md)
