@@ -11,7 +11,6 @@ You'll create your own MCP server that connects to Claude (or any MCP-compatible
 ## 📋 Table of Contents
 
 ### 🛠 Instructions
-- [Overview](./instructions/overview.md) – Workshop agenda, goals, and intro to MCP
 - [Getting Started](./instructions/getting-started.md) – Prerequisites and environment setup
 - [Deploying Your MCP](./instructions/deploying-your-mcp.md) – Step-by-step deployment guide
 - [Connect to Claude](./instructions/connect-to-claude.md) – Configure Claude to call your MCP server
@@ -66,4 +65,4 @@ This workshop is open-source under the MIT License.
 
 **Let’s build something powerful together.**
 
-👉 [**Start with the Overview →**](./instructions/overview.md)
+👉 [**Start with the Getting Started →**](./instructions/getting-started.md)
