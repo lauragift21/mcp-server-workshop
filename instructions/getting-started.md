@@ -70,11 +70,11 @@ cd mcp-server-workshop
 Navigate into one of the use case folders:
 
 ```bash
-cd use-cases/travel-planner/mcp-server
+cd use-cases/travel-planner
 # or
-cd use-cases/restaurant-reservation/mcp-server
+cd use-cases/restaurant-reservation
 # or
-cd use-cases/meeting-summary/mcp-server
+cd use-cases/meeting-summary
 ```
 
 ---
@@ -90,7 +90,7 @@ npm install
 ### 3️⃣ Review Project Structure
 
 ```
-mcp-server/
+use-cases/<use-case-name>
 ├── package.json         # Project dependencies and scripts
 ├── wrangler.toml        # Cloudflare Worker configuration
 ├── tsconfig.json        # TypeScript configuration
