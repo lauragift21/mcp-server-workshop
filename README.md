@@ -12,8 +12,9 @@ You'll create your own MCP server that connects to Claude (or any MCP-compatible
 
 ### 🛠 Instructions
 - [Getting Started](./instructions/getting-started.md) – Prerequisites and environment setup
+- [Building an MCP Server](./instructions/building-an-mcp-server.md) – MCP Server Instructions
 - [Deploying Your MCP](./instructions/deploying-your-mcp.md) – Step-by-step deployment guide
-- [Connect to Claude](./instructions/connect-to-claude.md) – Configure Claude to call your MCP server
+- [Connect to a MCP Client](./instructions/connect-to-mcp-client.md) – Configure Claude or any other MCP Client to call your MCP server
 - [Building a UI](./instructions/building-a-ui.md) – *(Optional)* Build a web UI using Cloudflare Pages
 - [Submission](./instructions/submission.md) – Submit your project to win prizes 🎁
 
@@ -23,9 +24,9 @@ You'll create your own MCP server that connects to Claude (or any MCP-compatible
 
 We'll vote and build **one live** during the workshop—but you can explore and finish any of these on your own:
 
-- ✈️ [**Travel Planner**](./use-cases/travel-planner/) – Claude integrates with your calendar & travel APIs to plan trips
+- ✈️ [**Real-time Travel Planner**](./use-cases/travel-planner/) – Claude integrates with your calendar & travel APIs to plan trips
 - 🍽 [**Restaurant Reservation**](./use-cases/restaurant-reservation/) – Claude connects to a booking platform like OpenTable
-- 📝 [**Meeting Summary**](./use-cases/meeting-summary/) – Claude summarizes notes and creates Jira tasks from Google Docs
+- 📝 [**AI-Powered Meeting Summary**](./use-cases/meeting-summary/) – Claude summarizes notes and creates Jira tasks from Google Docs
 
 ---
 
@@ -35,7 +36,7 @@ We'll vote and build **one live** during the workshop—but you can explore and 
 2. 🛠 Follow the [Getting Started](./instructions/getting-started.md) guide
 3. 🌐 Choose a use case or build your own idea
 4. 🚢 Deploy your MCP server using `wrangler`
-5. 🤖 [Connect to Claude](./instructions/connect-to-claude.md) and test your setup
+5. 🤖 [Connect to a MCP Client](./instructions/connect-to-mcp-client.md) and test your setup
 
 ---
 
@@ -54,12 +55,6 @@ By the end of this workshop, you'll have:
 - 📌 Each guide includes troubleshooting tips
 - 🧑‍🏫 Ask mentors during the workshop
 - 🚀 Ready to show off? [Submit your project](./instructions/submission.md)
-
----
-
-## 📄 License
-
-This workshop is open-source under the MIT License.
 
 ---
 

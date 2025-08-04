@@ -41,12 +41,12 @@ If the file doesn't exist, create it. Here's the basic structure:
 ```json
 {
   "mcpServers": {
-    "your-server-name": {
-      "command": "node",
-      "args": ["/path/to/your/server.js"],
-      "env": {
-        "API_KEY": "your-api-key"
-      }
+    "calculator": {
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "http://localhost:8787/sse"  // or remote-mcp-server-authless.your-account.workers.dev/sse
+      ]
     }
   }
 }
