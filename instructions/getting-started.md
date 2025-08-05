@@ -147,4 +147,4 @@ Once your environment is set up and you can run the test client successfully, yo
 
 **Environment ready? Let's start building your MCP server!**
 
-👉 **[Continue to Deploying Your MCP →](./deploying-your-mcp.md)**
+👉 **[Continue to Building an MCP →](./building-an-mcp-server.md)**
