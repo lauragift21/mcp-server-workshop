@@ -131,4 +131,4 @@ You'll know you've succeeded when:
 
 **Ready to get started? Let's set up your development environment!**
 
-👉 **[Continue to Getting Started →](./getting-started.md)**
+👉 **[Continue to Building an MCP Server →](./building-an-mcp-server.md)**
