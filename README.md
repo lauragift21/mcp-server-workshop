@@ -15,7 +15,6 @@ You'll create your own MCP server that connects to Claude (or any MCP-compatible
 - [Building an MCP Server](./instructions/building-an-mcp-server.md) – MCP Server Instructions
 - [Deploying Your MCP](./instructions/deploying-your-mcp.md) – Step-by-step deployment guide
 - [Connect to a MCP Client](./instructions/connect-to-mcp-client.md) – Configure Claude or any other MCP Client to call your MCP server
-- [Building a UI](./instructions/building-a-ui.md) – *(Optional)* Build a web UI using Cloudflare Pages
 - [Submission](./instructions/submission.md) – Submit your project to win prizes 🎁
 
 ---

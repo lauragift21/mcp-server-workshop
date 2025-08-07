@@ -271,4 +271,4 @@ You'll know everything is working when:
 
 ---
 
-👉 **[Continue to Building a UI →](./building-a-ui.md)** *(Optional)*
+👉 **[Continue to Submission →](./submission.md)**
