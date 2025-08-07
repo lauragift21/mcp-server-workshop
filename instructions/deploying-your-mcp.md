@@ -52,4 +52,4 @@ wrangler secret put DATABASE_URL
 
 ---
 
-👉 **[Continue to Connect to Claude →](./connect-to-claude.md)**
+👉 **[Continue to Connect to a MCP Client →](./connect-to-mcp-client.md)**

@@ -117,22 +117,6 @@ This starts the Worker at: `http://localhost:8787`
 
 ---
 
-## 🔐 Environment Variables
-
-Create a `.dev.vars` file in your project root:
-
-```env
-ENVIRONMENT=development
-DEBUG=true
-
-# Optional: API keys for integrations
-# WEATHER_API_KEY=your-key
-# JIRA_TOKEN=your-token
-```
-
-> ⚠️ **Do not commit `.dev.vars` files** — always use `.gitignore`.
----
-
 ## 🎯 Next Steps
 
 Once your environment is set up and you can run the test client successfully, you're ready to start building!
@@ -141,7 +125,7 @@ Once your environment is set up and you can run the test client successfully, yo
 
 - **Understand Your Use Case**: Read the README in your chosen use case directory
 - **Implement Tools**: Add the specific tools your use case needs
-- **Add Resources**: Create resources that provide data to the AI
+- **Deploy Your MCP Server**: Deploy your MCP server to Cloudflare Workers
 
 ---
 
