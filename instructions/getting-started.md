@@ -119,7 +119,7 @@ This starts the Worker at: `http://localhost:8787`
 
 ## 🔐 Environment Variables
 
-Create a `.env` file in your project root:
+Create a `.dev.vars` file in your project root:
 
 ```env
 ENVIRONMENT=development
@@ -130,7 +130,7 @@ DEBUG=true
 # JIRA_TOKEN=your-token
 ```
 
-> ⚠️ **Do not commit `.env` files** — always use `.gitignore`.
+> ⚠️ **Do not commit `.dev.vars` files** — always use `.gitignore`.
 ---
 
 ## 🎯 Next Steps
