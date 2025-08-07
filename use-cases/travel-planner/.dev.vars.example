@@ -1,0 +1,4 @@
+GOOGLE_CLIENT_ID=<your google oauth client id>
+GOOGLE_CLIENT_SECRET=<your google oauth client secret>
+COOKIE_ENCRYPTION_KEY=<your cookie cookie encryption key>
+HOSTED_DOMAIN=<optional: use this when restrict google account domain>

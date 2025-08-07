@@ -1,75 +1,35 @@
-import { McpAgent } from "agents/mcp";
+import OAuthProvider from "@cloudflare/workers-oauth-provider";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpAgent } from "agents/mcp";
 import { z } from "zod";
+import { GoogleHandler } from "./google-handler";
 
-// Define our MCP agent with tools
-export class MyMCP extends McpAgent {
+// Context from the auth process, encrypted & stored in the auth token
+// and provided to the MyMCP as this.props
+type Props = {
+	name: string;
+	email: string;
+	accessToken: string;
+};
+
+export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 	server = new McpServer({
-		name: "Authless Calculator",
-		version: "1.0.0",
+		name: "Google OAuth Proxy Demo",
+		version: "0.0.1",
 	});
 
 	async init() {
-		// Simple addition tool
-		this.server.tool(
-			"add",
-			{ a: z.number(), b: z.number() },
-			async ({ a, b }) => ({
-				content: [{ type: "text", text: String(a + b) }],
-			})
-		);
-
-		// Calculator tool with multiple operations
-		this.server.tool(
-			"calculate",
-			{
-				operation: z.enum(["add", "subtract", "multiply", "divide"]),
-				a: z.number(),
-				b: z.number(),
-			},
-			async ({ operation, a, b }) => {
-				let result: number;
-				switch (operation) {
-					case "add":
-						result = a + b;
-						break;
-					case "subtract":
-						result = a - b;
-						break;
-					case "multiply":
-						result = a * b;
-						break;
-					case "divide":
-						if (b === 0)
-							return {
-								content: [
-									{
-										type: "text",
-										text: "Error: Cannot divide by zero",
-									},
-								],
-							};
-						result = a / b;
-						break;
-				}
-				return { content: [{ type: "text", text: String(result) }] };
-			}
-		);
+		this.server.tool("add", { a: z.number(), b: z.number() }, async ({ a, b }) => ({
+			content: [{ text: String(a + b), type: "text" }],
+		}));
 	}
 }
 
-export default {
-	fetch(request: Request, env: Env, ctx: ExecutionContext) {
-		const url = new URL(request.url);
-
-		if (url.pathname === "/sse" || url.pathname === "/sse/message") {
-			return MyMCP.serveSSE("/sse").fetch(request, env, ctx);
-		}
-
-		if (url.pathname === "/mcp") {
-			return MyMCP.serve("/mcp").fetch(request, env, ctx);
-		}
-
-		return new Response("Not found", { status: 404 });
-	},
-};
+export default new OAuthProvider({
+	apiHandler: MyMCP.mount("/sse") as any,
+	apiRoute: "/sse",
+	authorizeEndpoint: "/authorize",
+	clientRegistrationEndpoint: "/register",
+	defaultHandler: GoogleHandler as any,
+	tokenEndpoint: "/token",
+});
