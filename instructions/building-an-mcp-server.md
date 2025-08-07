@@ -36,4 +36,36 @@ Each use case includes a comprehensive README with step-by-step instructions:
 
 ---
 
+## Best Practices
+
+### 🎯 Tool Design
+**Focus on user goals, not API coverage.** Don't treat your MCP server as a wrapper around your full API schema. Instead, build tools that are optimized for specific user workflows and reliable outcomes.
+
+- ✅ **Fewer, well-designed tools** often outperform many granular ones
+- ✅ **Optimize for agents** with small context windows and tight latency budgets
+- ✅ **Combine related operations** into single, powerful tools when it makes sense
+
+### 🔒 Scoped Permissions
+**Deploy focused servers with narrow permissions.** This reduces security risks and makes your system easier to manage and audit.
+
+- ✅ **One server per domain** (e.g., separate servers for calendar, travel, finance)
+- ✅ **Minimal required permissions** for each server's specific use case
+- ✅ **Clear audit trails** of what each server can access
+
+### 📝 Tool Descriptions
+**Write detailed, clear parameter descriptions.** Help agents understand exactly how to use your tools correctly.
+
+- ✅ **Expected values and formats** for each parameter
+- ✅ **Behavioral constraints** and important limitations
+- ✅ **Example usage patterns** in your descriptions
+- ✅ **Error conditions** and how to handle them
+
+### 🧪 Evaluation & Testing
+**Use evaluation tests ('evals') to measure tool effectiveness.** This ensures your tools work reliably as your server evolves.
+
+- ✅ **Test agent interactions** with your tools regularly
+- ✅ **Run evals after updates** to catch regressions early
+- ✅ **Track improvements** in tool usage over time
+- ✅ **Validate real-world scenarios** your users will encounter
+
 **Ready to build? Pick your use case and dive into the detailed guide!**
