@@ -7,18 +7,15 @@ Before we dive into building MCP servers with Cloudflare, let's understand the c
 The Model Context Protocol follows a client-server architecture where your MCP server will fit into a broader ecosystem:
 
 ```mermaid
-flowchart LR
-    subgraph "Your Setup"
-        Claude["Claude Desktop/API"]
-        CF[\"Your Cloudflare Workers MCP Server"]
-        Claude <-->|"MCP Protocol"| CF
-    end
-    subgraph "External Services"
-        CF <-->|"HTTP/APIs"| APIs["Travel APIs, Google Calendar, OpenTable, etc."]
-    end
-    subgraph "Data Sources"
-        CF <-->|"Databases"| DB["D1 Database, KV Storage"]
-    end
+flowchart TD
+    Claude[Claude Desktop/API] 
+    Server[Your Cloudflare MCP Server]
+    APIs[External APIs<br/>Travel, Calendar, etc.]
+    Storage[Cloudflare Services<br/>D1, KV, R2]
+    
+    Claude <--> Server
+    Server <--> APIs
+    Server <--> Storage
 ```
 
 ### Key Components in Your Workshop Context:
@@ -99,4 +96,4 @@ Your workshop leverages Cloudflare because it's perfect for MCP servers:
 
 ---
 
-**Ready to build?** Now that you understand how MCP works, let's dive in [and  your server](./getting-started.md)!
+**Ready to build?** Now that you understand how MCP works, let's dive in [and build your server](./getting-started.md)!
