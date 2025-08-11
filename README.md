@@ -11,6 +11,7 @@ You'll create your own MCP server that connects to Claude (or any MCP-compatible
 ## 📋 Table of Contents
 
 ### 🛠 Instructions
+- [MCP Fundamentals](./instructions/mcp-fundamentals.md) – Understand the Model Context Protocol architecture
 - [Getting Started](./instructions/getting-started.md) – Prerequisites and environment setup
 - [Building an MCP Server](./instructions/building-an-mcp-server.md) – MCP Server Instructions
 - [Deploying Your MCP](./instructions/deploying-your-mcp.md) – Step-by-step deployment guide
