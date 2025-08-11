@@ -5,9 +5,7 @@ Before we dive into building MCP servers with Cloudflare, let's understand the c
 
 ## 📚 What is MCP?
 
-The Model Context Protocol (MCP) is an open protocol that standardizes how applications provide context to large language models (LLMs). 
-
-Think of MCP like a USB-C port for AI - it provides a standardized way to connect AI models to different data sources and tools.
+The Model Context Protocol (MCP) is an open protocol that standardizes how applications provide context to large language models (LLMs). Think of MCP like a USB-C port for AI - it provides a standardized way to connect AI models to different data sources and tools.
 
 ## 🏗️ MCP Architecture Overview
 
@@ -23,14 +21,6 @@ flowchart TD
     Claude <--> Server
     Server <--> APIs
     Server <--> Storage
-    
-    classDef mcpHost fill:#e1f5fe,stroke:#01579b,stroke-width:3px
-    classDef mcpServer fill:#f3e5f5,stroke:#4a148c,stroke-width:3px
-    classDef external fill:#f1f8e9,stroke:#33691e,stroke-width:2px
-    
-    class Claude mcpHost
-    class Server mcpServer
-    class APIs,Storage external
 ```
 
 ### Key Components in Your Workshop Context:
