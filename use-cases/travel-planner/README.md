@@ -1570,27 +1570,27 @@ export class CalendarService {
 ```
 
 
-## 🚀 Final Steps
+## 🚀 Deployment
 
-1. **Deploying to Cloudflare Workers**:
+1. **Deploy to Cloudflare Workers**:
 
-  ```bash
-  # Deploy to Cloudflare Workers
-  npm run deploy
-  ```
+```bash
+# Deploy the worker
+npm run deploy
 
-After deployment, your MCP server will be available at:
-`https://your-worker-name.your-subdomain.workers.dev`
+# Your MCP server will be deployed to: `https://restaurant-reservation-mcp.<your-account>.workers.dev`
+```
 
 2. **Upload your environment variables to Cloudflare**:
-  ```bash
-  wrangler secret bulk .dev.vars
-  ```
 
+```bash
+# Set environment variables
+wrangler secret bulk .dev.vars
+```
 
-## 🧪 Testing with Claude
+## 💬 Example Usage
 
-Once deployed, you can test your MCP server with Claude:
+Try these commands with Claude:
 
 ### Example Conversations
 
@@ -1609,7 +1609,7 @@ Create a travel plan for Paris and London, December 15-22, budget $3000
 Check if I have any conflicts for my December 15-22 trip
 ```
 
-## 🛠️ Troubleshooting
+## 🔔 Troubleshooting
 
 ### Common Issues
 
@@ -1632,8 +1632,6 @@ Check if I have any conflicts for my December 15-22 trip
 - Verify `wrangler.jsonc` configuration
 - Check Cloudflare account permissions
 - Ensure environment variables are set in Cloudflare dashboard
-
-
 
 ## 📚 Additional Resources
 

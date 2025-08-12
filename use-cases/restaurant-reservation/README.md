@@ -1030,12 +1030,11 @@ Try these commands with Claude:
    - Run `npm run type-check` to verify TypeScript
    - Ensure all dependencies are installed: `npm install`
 
-## 🎉 Next Steps
-
-Congratulations! You've built a complete restaurant reservation MCP server. 
 
 ## 📚 Additional Resources
 
 - [Model Context Protocol Documentation](https://modelcontextprotocol.io/)
 - [Cloudflare MCP Documentation](https://developers.cloudflare.com/agents/model-context-protocol/)
 - [Yelp Fusion API Documentation](https://www.yelp.com/developers/documentation/v3) 
+
+Congratulations! You've built a complete restaurant reservation MCP server. 
