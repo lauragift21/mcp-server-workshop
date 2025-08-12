@@ -1691,7 +1691,7 @@ export class BookingService {
 }
 ```
 
-### Step 14: Add Type Defination
+### Step 14: Add Type Definition
 
 ```ts
 // Flight-related types
