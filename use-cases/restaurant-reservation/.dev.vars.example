@@ -1,0 +1,4 @@
+# Yelp Fusion API Configuration
+# Get your API key from: https://www.yelp.com/developers/v3/manage_app
+YELP_API_KEY=your_yelp_api_key_here
+YELP_CLIENT_ID=your_yelp_client_id_here
