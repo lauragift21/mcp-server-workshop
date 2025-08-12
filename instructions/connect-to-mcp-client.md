@@ -62,8 +62,8 @@ For a server deployed on Cloudflare Workers, use this configuration:
     "travel-planner": {
       "command": "npx",
       "args": [
-        "@modelcontextprotocol/server-fetch",
-        "https://your-mcp-server.your-subdomain.workers.dev"
+        "mcp-remote",
+        "https://your-mcp-server.your-subdomain.workers.dev/sse"
       ]
     }
   }
@@ -80,25 +80,22 @@ Here's a full example with multiple servers:
     "travel-planner": {
       "command": "npx",
       "args": [
-        "@modelcontextprotocol/server-fetch",
-        "https://travel-planner.your-subdomain.workers.dev"
-      ],
-      "env": {
-        "TRAVEL_API_KEY": "your-travel-api-key"
-      }
+        "mcp-remote",
+        "https://travel-planner.your-subdomain.workers.dev/sse"
+      ]
     },
     "restaurant-reservation": {
       "command": "npx",
       "args": [
-        "@modelcontextprotocol/server-fetch",
-        "https://restaurant-server.your-subdomain.workers.dev"
+        "mcp-remote",
+        "https://restaurant-server.your-subdomain.workers.dev/sse"
       ]
     },
     "meeting-summary": {
       "command": "npx",
       "args": [
-        "@modelcontextprotocol/server-fetch",
-        "https://meeting-server.your-subdomain.workers.dev"
+        "mcp-remote",
+        "https://meeting-server.your-subdomain.workers.dev/sse"
       ]
     }
   }
