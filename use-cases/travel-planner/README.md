@@ -917,130 +917,222 @@ export class FlightService {
 Create `src/services/hotel-service.ts`:
 
 ```typescript
-import { FlightSearchParams, FlightInfo, AviationstackResponse } from '../types/index.js';
+import { HotelSearchParams, HotelResult, HotelsComResponse } from '../types/index.js';
 
-export class FlightService {
-  private apiKey: string;
-  private baseUrl = 'http://api.aviationstack.com/v1';
+export class HotelService {
+  private rapidApiKey: string;
+  private baseUrl = 'https://hotels-com-provider.p.rapidapi.com';
 
-  constructor(apiKey: string) {
-    this.apiKey = apiKey;
+  constructor(rapidApiKey: string) {
+    this.rapidApiKey = rapidApiKey;
   }
 
-  async searchFlights(params: FlightSearchParams): Promise<FlightInfo[]> {
+  async searchHotels(params: HotelSearchParams): Promise<HotelResult[]> {
     try {
-      // Search for flights using Aviationstack API
-      const url = new URL(`${this.baseUrl}/flights`);
-      url.searchParams.set('access_key', this.apiKey);
-      url.searchParams.set('dep_iata', params.origin);
-      url.searchParams.set('arr_iata', params.destination);
-      url.searchParams.set('flight_date', params.departureDate);
-      url.searchParams.set('limit', '50');
+      // Search for hotels using Hotels.com RapidAPI
+      const url = new URL(`${this.baseUrl}/v2/hotels/search`);
+      url.searchParams.set('domain', 'US');
+      url.searchParams.set('sort_order', 'REVIEW');
+      url.searchParams.set('locale', 'en_US');
+      url.searchParams.set('checkout_date', params.checkOut);
+      url.searchParams.set('checkin_date', params.checkIn);
+      url.searchParams.set('adults_number', params.guests.toString());
+      url.searchParams.set('room_number', (params.rooms || 1).toString());
+      url.searchParams.set('region_id', await this.getRegionId(params.destination));
 
-      const response = await fetch(url.toString());
-      
+      const response = await fetch(url.toString(), {
+        headers: {
+          'X-RapidAPI-Key': this.rapidApiKey,
+          'X-RapidAPI-Host': 'hotels-com-provider.p.rapidapi.com'
+        }
+      });
+
       if (!response.ok) {
-        throw new Error(`Flight API error: ${response.status} ${response.statusText}`);
+        throw new Error(`Hotel API error: ${response.status} ${response.statusText}`);
       }
 
-      const data: AviationstackResponse = await response.json();
-      
-      return this.transformFlightData(data.data, params);
+      const data = await response.json() as HotelsComResponse;
+      return this.transformHotelData(data.data.hotels, params);
     } catch (error) {
-      console.error('Error searching flights:', error);
+      console.error('Error searching hotels:', error);
       // Return mock data for development
-      return this.getMockFlights(params);
+      return this.getMockHotels(params);
     }
   }
 
-  private transformFlightData(flights: AviationstackResponse['data'], params: FlightSearchParams): FlightInfo[] {
-    return flights.map((flight, index) => ({
-      id: `flight_${index}_${Date.now()}`,
-      airline: flight.airline.name,
-      flightNumber: flight.flight.iata,
-      origin: flight.departure.iata,
-      destination: flight.arrival.iata,
-      departureTime: flight.departure.scheduled,
-      arrivalTime: flight.arrival.scheduled,
-      duration: this.calculateDuration(flight.departure.scheduled, flight.arrival.scheduled),
-      price: this.estimatePrice(params.origin, params.destination, params.class || 'economy'),
-      currency: 'USD',
-      aircraft: flight.aircraft.iata,
-      stops: 0, // Aviationstack doesn't provide stops info directly
-      bookingUrl: `https://www.kayak.com/flights/${params.origin}-${params.destination}/${params.departureDate}`
+  private async getRegionId(destination: string): Promise<string> {
+    try {
+      // Get region ID for the destination
+      const url = new URL(`${this.baseUrl}/v1/hotels/locations`);
+      url.searchParams.set('domain', 'US');
+      url.searchParams.set('locale', 'en_US');
+      url.searchParams.set('name', destination);
+
+      const response = await fetch(url.toString(), {
+        headers: {
+          'X-RapidAPI-Key': this.rapidApiKey,
+          'X-RapidAPI-Host': 'hotels-com-provider.p.rapidapi.com'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json() as { data?: Array<{ gaiaId?: string }> };
+        return data.data?.[0]?.gaiaId || '6054439'; // Default to New York if not found
+      }
+    } catch (error) {
+      console.error('Error getting region ID:', error);
+    }
+    return '6054439'; // Default region ID
+  }
+
+  private transformHotelData(hotels: HotelsComResponse['data']['hotels'], params: HotelSearchParams): HotelResult[] {
+    const checkIn = new Date(params.checkIn);
+    const checkOut = new Date(params.checkOut);
+    const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
+
+    return hotels.map((hotel, index) => ({
+      id: hotel.id || `hotel_${index}_${Date.now()}`,
+      name: hotel.name,
+      address: hotel.address,
+      city: hotel.city,
+      country: hotel.country,
+      rating: hotel.rating,
+      pricePerNight: hotel.price.amount,
+      currency: hotel.price.currency,
+      totalPrice: hotel.price.amount * nights,
+      amenities: hotel.amenities || [],
+      images: hotel.images || [],
+      description: hotel.description,
+      coordinates: hotel.coordinates ? {
+        latitude: hotel.coordinates.lat,
+        longitude: hotel.coordinates.lng
+      } : undefined,
+      bookingUrl: `https://www.hotels.com/ho${hotel.id}`
     }));
   }
 
-  private calculateDuration(departure: string, arrival: string): string {
-    const dep = new Date(departure);
-    const arr = new Date(arrival);
-    const diffMs = arr.getTime() - dep.getTime();
-    const hours = Math.floor(diffMs / (1000 * 60 * 60));
-    const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-    return `${hours}h ${minutes}m`;
-  }
+  private getMockHotels(params: HotelSearchParams): HotelResult[] {
+    const checkIn = new Date(params.checkIn);
+    const checkOut = new Date(params.checkOut);
+    const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
 
-  private estimatePrice(origin: string, destination: string, flightClass: string): number {
-    // Simple price estimation based on distance and class
-    const basePrice = 200;
-    const classMultiplier = flightClass === 'business' ? 3 : flightClass === 'first' ? 5 : 1;
-    const randomFactor = 0.8 + Math.random() * 0.4; // 80% to 120% of base
-    return Math.round(basePrice * classMultiplier * randomFactor);
-  }
-
-  private getMockFlights(params: FlightSearchParams): FlightInfo[] {
     return [
       {
-        id: `mock_flight_1_${Date.now()}`,
-        airline: 'American Airlines',
-        flightNumber: 'AA1234',
-        origin: params.origin,
-        destination: params.destination,
-        departureTime: `${params.departureDate}T08:00:00Z`,
-        arrivalTime: `${params.departureDate}T12:30:00Z`,
-        duration: '4h 30m',
-        price: 450,
+        id: `mock_hotel_1_${Date.now()}`,
+        name: 'Grand Plaza Hotel',
+        address: '123 Main Street',
+        city: params.destination,
+        country: 'United States',
+        rating: 4.2,
+        pricePerNight: 180,
         currency: 'USD',
-        aircraft: 'Boeing 737',
-        stops: 0,
-        bookingUrl: `https://www.kayak.com/flights/${params.origin}-${params.destination}/${params.departureDate}`
+        totalPrice: 180 * nights,
+        amenities: ['Free WiFi', 'Pool', 'Gym', 'Restaurant', 'Room Service'],
+        images: [
+          'https://example.com/hotel1-1.jpg',
+          'https://example.com/hotel1-2.jpg'
+        ],
+        description: 'A luxurious hotel in the heart of the city with modern amenities and excellent service.',
+        coordinates: {
+          latitude: 40.7128,
+          longitude: -74.0060
+        },
+        bookingUrl: 'https://www.hotels.com/ho123456'
       },
       {
-        id: `mock_flight_2_${Date.now()}`,
-        airline: 'Delta Air Lines',
-        flightNumber: 'DL5678',
-        origin: params.origin,
-        destination: params.destination,
-        departureTime: `${params.departureDate}T14:15:00Z`,
-        arrivalTime: `${params.departureDate}T18:45:00Z`,
-        duration: '4h 30m',
-        price: 520,
+        id: `mock_hotel_2_${Date.now()}`,
+        name: 'City Center Inn',
+        address: '456 Business District',
+        city: params.destination,
+        country: 'United States',
+        rating: 3.8,
+        pricePerNight: 120,
         currency: 'USD',
-        aircraft: 'Airbus A320',
-        stops: 0,
-        bookingUrl: `https://www.kayak.com/flights/${params.origin}-${params.destination}/${params.departureDate}`
+        totalPrice: 120 * nights,
+        amenities: ['Free WiFi', 'Business Center', 'Parking', 'Continental Breakfast'],
+        images: [
+          'https://example.com/hotel2-1.jpg',
+          'https://example.com/hotel2-2.jpg'
+        ],
+        description: 'Comfortable accommodations perfect for business travelers and tourists alike.',
+        coordinates: {
+          latitude: 40.7589,
+          longitude: -73.9851
+        },
+        bookingUrl: 'https://www.hotels.com/ho789012'
+      },
+      {
+        id: `mock_hotel_3_${Date.now()}`,
+        name: 'Boutique Suites',
+        address: '789 Trendy Avenue',
+        city: params.destination,
+        country: 'United States',
+        rating: 4.6,
+        pricePerNight: 250,
+        currency: 'USD',
+        totalPrice: 250 * nights,
+        amenities: ['Free WiFi', 'Spa', 'Rooftop Bar', 'Concierge', 'Pet Friendly'],
+        images: [
+          'https://example.com/hotel3-1.jpg',
+          'https://example.com/hotel3-2.jpg'
+        ],
+        description: 'Stylish boutique hotel with personalized service and unique design elements.',
+        coordinates: {
+          latitude: 40.7505,
+          longitude: -73.9934
+        },
+        bookingUrl: 'https://www.hotels.com/ho345678'
       }
     ];
   }
 
-  async getFlightStatus(flightNumber: string, date: string): Promise<any> {
+  async getHotelDetails(hotelId: string): Promise<HotelResult | null> {
     try {
-      const url = new URL(`${this.baseUrl}/flights`);
-      url.searchParams.set('access_key', this.apiKey);
-      url.searchParams.set('flight_iata', flightNumber);
-      url.searchParams.set('flight_date', date);
+      const url = new URL(`${this.baseUrl}/v2/hotels/details`);
+      url.searchParams.set('domain', 'US');
+      url.searchParams.set('locale', 'en_US');
+      url.searchParams.set('hotel_id', hotelId);
 
-      const response = await fetch(url.toString());
-      
+      const response = await fetch(url.toString(), {
+        headers: {
+          'X-RapidAPI-Key': this.rapidApiKey,
+          'X-RapidAPI-Host': 'hotels-com-provider.p.rapidapi.com'
+        }
+      });
+
       if (!response.ok) {
-        throw new Error(`Flight status API error: ${response.status}`);
+        throw new Error(`Hotel details API error: ${response.status}`);
       }
 
-      return await response.json();
+      const data = await response.json() as { data: any };
+      // Transform the detailed hotel data
+      return this.transformSingleHotelData(data.data);
     } catch (error) {
-      console.error('Error getting flight status:', error);
-      return { status: 'unknown', message: 'Unable to fetch flight status' };
+      console.error('Error getting hotel details:', error);
+      return null;
     }
+  }
+
+  private transformSingleHotelData(hotel: any): HotelResult {
+    return {
+      id: hotel.id,
+      name: hotel.name,
+      address: hotel.address?.line1 || '',
+      city: hotel.address?.city || '',
+      country: hotel.address?.country || '',
+      rating: hotel.reviews?.score || 0,
+      pricePerNight: hotel.ratePlan?.price?.current || 0,
+      currency: hotel.ratePlan?.price?.currency || 'USD',
+      totalPrice: hotel.ratePlan?.price?.current || 0,
+      amenities: hotel.amenities?.map((a: any) => a.name) || [],
+      images: hotel.images?.map((img: any) => img.url) || [],
+      description: hotel.summary || '',
+      coordinates: hotel.coordinate ? {
+        latitude: hotel.coordinate.lat,
+        longitude: hotel.coordinate.lon
+      } : undefined,
+      bookingUrl: `https://www.hotels.com/ho${hotel.id}`
+    };
   }
 }
 ```
