@@ -123,7 +123,7 @@ import OAuthProvider from '@cloudflare/workers-oauth-provider'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { McpAgent } from 'agents/mcp'
 import { GoogleHandler } from './google-handler.js'
-import { registerAllTools } from './tools/index'
+import { registerAllTools } from './tools'
 import { Props } from './utils'
 
 export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
@@ -155,7 +155,7 @@ Create `src/tools/index.ts`:
 
 ```typescript
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
-import { Props } from '../utils.js'
+import { Props } from '../utils'
 import { registerFlightTools } from './flight'
 import { registerHotelTools } from './hotel'
 import { registerCalendarTools } from './calendar'
@@ -475,7 +475,7 @@ Create `src/tools/calendar.ts`:
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 import { CalendarService } from '../services/calendar-service'
-import { Props } from '../utils.js'
+import { Props } from '../utils'
 
 export function registerCalendarTools(server: McpServer, props: Props) {
   const calendarService = new CalendarService(props.accessToken)
@@ -784,7 +784,7 @@ export function registerTravelPlanTools(server: McpServer, props: Props) {
 Create `src/services/flight-service.ts`:
 
 ```typescript
-import { FlightSearchParams, FlightInfo, AviationstackResponse } from '../types/index.js';
+import { FlightSearchParams, FlightInfo, AviationstackResponse } from '../types';
 
 export class FlightService {
   private apiKey: string;
@@ -917,7 +917,7 @@ export class FlightService {
 Create `src/services/hotel-service.ts`:
 
 ```typescript
-import { HotelSearchParams, HotelResult, HotelsComResponse } from '../types/index.js';
+import { HotelSearchParams, HotelResult, HotelsComResponse } from '../types';
 
 export class HotelService {
   private rapidApiKey: string;
@@ -1140,7 +1140,7 @@ export class HotelService {
 ### Step 12: Create Calendar Service
 
 ```typescript
- import { CalendarEvent, Conflict } from '../types/index.js';
+ import { CalendarEvent, Conflict } from '../types';
 
 export class CalendarService {
   private accessToken: string;
@@ -1402,265 +1402,568 @@ export class CalendarService {
 ### Step 13: Create Booking Service (Optional)
 
 ```typescript
-import { CalendarEvent, Conflict } from '../types/index.js';
+import {
+  FlightBookingRequest,
+  HotelBookingRequest,
+  BookingConfirmation,
+  FlightBookingDetails,
+  HotelBookingDetails,
+  TravelPlan,
+} from '../types'
 
-export class CalendarService {
-  private accessToken: string;
-  private baseUrl = 'https://www.googleapis.com/calendar/v3';
+export class BookingService {
+  private accessToken: string
 
   constructor(accessToken: string) {
-    this.accessToken = accessToken;
+    this.accessToken = accessToken
   }
 
-  async getEvents(startDate: string, endDate: string): Promise<CalendarEvent[]> {
+  async bookFlight(request: FlightBookingRequest): Promise<BookingConfirmation> {
     try {
-      const url = new URL(`${this.baseUrl}/calendars/primary/events`);
-      url.searchParams.set('timeMin', new Date(startDate).toISOString());
-      url.searchParams.set('timeMax', new Date(endDate).toISOString());
-      url.searchParams.set('singleEvents', 'true');
-      url.searchParams.set('orderBy', 'startTime');
+      // In a real implementation, this would integrate with airline booking APIs
+      // For now, we'll simulate the booking process
+      console.log('Processing flight booking:', request)
 
-      const response = await fetch(url.toString(), {
-        headers: {
-          'Authorization': `Bearer ${this.accessToken}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      // Simulate API call delay
+      await new Promise((resolve) => setTimeout(resolve, 2000))
 
-      if (!response.ok) {
-        throw new Error(`Calendar API error: ${response.status} ${response.statusText}`);
+      // Generate booking confirmation
+      const bookingId = `FL${Date.now()}${Math.random().toString(36).substr(2, 6).toUpperCase()}`
+      const confirmationNumber = `${Math.random().toString(36).substr(2, 6).toUpperCase()}`
+
+      const confirmation: BookingConfirmation = {
+        bookingId,
+        confirmationNumber,
+        status: 'confirmed',
+        totalPrice: 0, // Will be calculated based on flight price
+        currency: 'USD',
+        bookingDate: new Date().toISOString(),
+        details: {
+          type: 'flight',
+          flight: {} as any, // Will be populated with actual flight data
+          passengers: request.passengers,
+          seatAssignments: request.passengers.map((_, index) => `${String.fromCharCode(65 + index)}${Math.floor(Math.random() * 30) + 1}`),
+        } as FlightBookingDetails,
       }
 
-      const data = await response.json() as { items?: any[] };
-      return this.transformCalendarEvents(data.items || []);
+      // In production, you would:
+      // 1. Validate passenger information
+      // 2. Check flight availability
+      // 3. Process payment
+      // 4. Create booking with airline
+      // 5. Send confirmation email
+      // 6. Add to user's calendar
+
+      return confirmation
     } catch (error) {
-      console.error('Error fetching calendar events:', error);
-      // Return mock data for development
-      return this.getMockEvents(startDate, endDate);
+      console.error('Flight booking failed:', error)
+      throw new Error('Flight booking failed. Please try again.')
     }
   }
 
-  private transformCalendarEvents(events: any[]): CalendarEvent[] {
-    return events.map(event => ({
-      id: event.id,
-      summary: event.summary || 'No title',
-      description: event.description,
-      start: {
-        dateTime: event.start.dateTime,
-        date: event.start.date,
-        timeZone: event.start.timeZone
-      },
-      end: {
-        dateTime: event.end.dateTime,
-        date: event.end.date,
-        timeZone: event.end.timeZone
-      },
-      location: event.location
-    }));
-  }
-
-  private getMockEvents(startDate: string, endDate: string): CalendarEvent[] {
-    const start = new Date(startDate);
-    const mockEvents: CalendarEvent[] = [];
-
-    // Add some mock events for testing
-    const event1Date = new Date(start);
-    event1Date.setDate(start.getDate() + 1);
-    
-    mockEvents.push({
-      id: 'mock_event_1',
-      summary: 'Team Meeting',
-      description: 'Weekly team sync meeting',
-      start: {
-        dateTime: event1Date.toISOString().replace(/\.\d{3}Z$/, 'Z'),
-        timeZone: 'America/New_York'
-      },
-      end: {
-        dateTime: new Date(event1Date.getTime() + 60 * 60 * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z'),
-        timeZone: 'America/New_York'
-      },
-      location: 'Conference Room A'
-    });
-
-    const event2Date = new Date(start);
-    event2Date.setDate(start.getDate() + 2);
-    event2Date.setHours(14, 0, 0, 0);
-
-    mockEvents.push({
-      id: 'mock_event_2',
-      summary: 'Client Presentation',
-      description: 'Quarterly business review with client',
-      start: {
-        dateTime: event2Date.toISOString().replace(/\.\d{3}Z$/, 'Z'),
-        timeZone: 'America/New_York'
-      },
-      end: {
-        dateTime: new Date(event2Date.getTime() + 2 * 60 * 60 * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z'),
-        timeZone: 'America/New_York'
-      },
-      location: 'Client Office'
-    });
-
-    return mockEvents;
-  }
-
-  async createEvent(event: Partial<CalendarEvent>): Promise<CalendarEvent | null> {
+  async bookHotel(request: HotelBookingRequest): Promise<BookingConfirmation> {
     try {
-      const response = await fetch(`${this.baseUrl}/calendars/primary/events`, {
+      // In a real implementation, this would integrate with hotel booking APIs
+      console.log('Processing hotel booking:', request)
+
+      // Simulate API call delay
+      await new Promise((resolve) => setTimeout(resolve, 2000))
+
+      // Generate booking confirmation
+      const bookingId = `HT${Date.now()}${Math.random().toString(36).substr(2, 6).toUpperCase()}`
+      const confirmationNumber = `${Math.random().toString(36).substr(2, 6).toUpperCase()}`
+
+      const confirmation: BookingConfirmation = {
+        bookingId,
+        confirmationNumber,
+        status: 'confirmed',
+        totalPrice: 0, // Will be calculated based on hotel price
+        currency: 'USD',
+        bookingDate: new Date().toISOString(),
+        details: {
+          type: 'hotel',
+          hotel: {} as any, // Will be populated with actual hotel data
+          checkIn: request.checkIn,
+          checkOut: request.checkOut,
+          rooms: request.rooms,
+          guests: request.guestInfo,
+        } as HotelBookingDetails,
+      }
+
+      // In production, you would:
+      // 1. Validate guest information
+      // 2. Check room availability
+      // 3. Process payment
+      // 4. Create reservation with hotel
+      // 5. Send confirmation email
+      // 6. Add to user's calendar
+
+      return confirmation
+    } catch (error) {
+      console.error('Hotel booking failed:', error)
+      throw new Error('Hotel booking failed. Please try again.')
+    }
+  }
+
+  async createTravelPlan(
+    title: string,
+    destinations: string[],
+    startDate: string,
+    endDate: string,
+    travelers: number,
+    budget?: number,
+  ): Promise<TravelPlan> {
+    const planId = `TP${Date.now()}${Math.random().toString(36).substr(2, 6).toUpperCase()}`
+
+    const plan: TravelPlan = {
+      id: planId,
+      title,
+      destinations,
+      startDate,
+      endDate,
+      travelers,
+      budget,
+      status: 'planning',
+      flights: [],
+      hotels: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+
+    // In production, you would save this to a database
+    console.log('Created travel plan:', plan)
+
+    return plan
+  }
+
+  async getTravelPlan(planId: string): Promise<TravelPlan | null> {
+    // In production, you would retrieve this from a database
+    // For now, return a mock plan
+    const mockPlan: TravelPlan = {
+      id: planId,
+      title: 'European Adventure',
+      destinations: ['Paris', 'Rome', 'Barcelona'],
+      startDate: '2024-06-15',
+      endDate: '2024-06-25',
+      travelers: 2,
+      budget: 5000,
+      status: 'planning',
+      flights: [],
+      hotels: [],
+      createdAt: '2024-01-15T10:00:00Z',
+      updatedAt: '2024-01-15T10:00:00Z',
+    }
+
+    return mockPlan
+  }
+
+  async bookTrip(
+    planId: string,
+    flightBookings: FlightBookingRequest[],
+    hotelBookings: HotelBookingRequest[],
+  ): Promise<{
+    plan: TravelPlan
+    flightConfirmations: BookingConfirmation[]
+    hotelConfirmations: BookingConfirmation[]
+    totalCost: number
+  }> {
+    try {
+      // Get the travel plan
+      const plan = await this.getTravelPlan(planId)
+      if (!plan) {
+        throw new Error('Travel plan not found')
+      }
+
+      // Book all flights
+      const flightConfirmations: BookingConfirmation[] = []
+      for (const flightRequest of flightBookings) {
+        const confirmation = await this.bookFlight(flightRequest)
+        flightConfirmations.push(confirmation)
+      }
+
+      // Book all hotels
+      const hotelConfirmations: BookingConfirmation[] = []
+      for (const hotelRequest of hotelBookings) {
+        const confirmation = await this.bookHotel(hotelRequest)
+        hotelConfirmations.push(confirmation)
+      }
+
+      // Calculate total cost
+      const totalCost = [...flightConfirmations, ...hotelConfirmations].reduce((sum, booking) => sum + booking.totalPrice, 0)
+
+      // Update plan status
+      plan.status = 'booked'
+      plan.flights = flightConfirmations
+      plan.hotels = hotelConfirmations
+      plan.updatedAt = new Date().toISOString()
+
+      // In production, you would:
+      // 1. Save updated plan to database
+      // 2. Send confirmation emails
+      // 3. Add events to calendar
+      // 4. Set up travel reminders
+
+      return {
+        plan,
+        flightConfirmations,
+        hotelConfirmations,
+        totalCost,
+      }
+    } catch (error) {
+      console.error('Trip booking failed:', error)
+      throw new Error('Trip booking failed. Please try again.')
+    }
+  }
+
+  async addToCalendar(booking: BookingConfirmation): Promise<void> {
+    try {
+      // Create calendar events for the booking
+      if (booking.details.type === 'flight') {
+        const flightDetails = booking.details as FlightBookingDetails
+
+        // Create departure event
+        await this.createCalendarEvent({
+          summary: `Flight ${flightDetails.flight.flightNumber} - Departure`,
+          description: `Flight from ${flightDetails.flight.origin} to ${flightDetails.flight.destination}\nConfirmation: ${booking.confirmationNumber}`,
+          start: flightDetails.flight.departureTime,
+          end: flightDetails.flight.arrivalTime,
+          location: flightDetails.flight.origin,
+        })
+      } else if (booking.details.type === 'hotel') {
+        const hotelDetails = booking.details as HotelBookingDetails
+
+        // Create hotel stay event
+        await this.createCalendarEvent({
+          summary: `Hotel Stay - ${hotelDetails.hotel.name}`,
+          description: `Hotel reservation\nConfirmation: ${booking.confirmationNumber}\nAddress: ${hotelDetails.hotel.address}`,
+          start: `${hotelDetails.checkIn}T15:00:00`,
+          end: `${hotelDetails.checkOut}T11:00:00`,
+          location: hotelDetails.hotel.address,
+        })
+      }
+    } catch (error) {
+      console.error('Failed to add booking to calendar:', error)
+      // Don't throw error - calendar addition is optional
+    }
+  }
+
+  private async createCalendarEvent(event: {
+    summary: string
+    description: string
+    start: string
+    end: string
+    location?: string
+  }): Promise<void> {
+    try {
+      const url = 'https://www.googleapis.com/calendar/v3/calendars/primary/events'
+
+      const eventData = {
+        summary: event.summary,
+        description: event.description,
+        start: {
+          dateTime: new Date(event.start).toISOString(),
+          timeZone: 'UTC',
+        },
+        end: {
+          dateTime: new Date(event.end).toISOString(),
+          timeZone: 'UTC',
+        },
+        location: event.location,
+      }
+
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.accessToken}`,
-          'Content-Type': 'application/json'
+          Authorization: `Bearer ${this.accessToken}`,
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          summary: event.summary,
-          description: event.description,
-          start: event.start,
-          end: event.end,
-          location: event.location
-        })
-      });
+        body: JSON.stringify(eventData),
+      })
 
       if (!response.ok) {
-        throw new Error(`Calendar create event error: ${response.status}`);
+        throw new Error(`Calendar API error: ${response.status}`)
       }
-
-      const data = await response.json();
-      return this.transformCalendarEvents([data])[0];
     } catch (error) {
-      console.error('Error creating calendar event:', error);
-      return null;
-    }
-  }
-
-  checkConflicts(events: CalendarEvent[], travelStartDate: string, travelEndDate: string): Conflict[] {
-    const conflicts: Conflict[] = [];
-    const travelStart = new Date(travelStartDate);
-    const travelEnd = new Date(travelEndDate);
-
-    // Add buffer time for travel (4 hours before departure, 2 hours after return)
-    const departureBuffer = new Date(travelStart.getTime() - 4 * 60 * 60 * 1000);
-    const returnBuffer = new Date(travelEnd.getTime() + 2 * 60 * 60 * 1000);
-
-    for (const event of events) {
-      const eventStart = new Date(event.start.dateTime || event.start.date || '');
-      const eventEnd = new Date(event.end.dateTime || event.end.date || '');
-
-      // Check for overlaps with travel period
-      if (this.isOverlapping(eventStart, eventEnd, travelStart, travelEnd)) {
-        conflicts.push({
-          type: 'overlap',
-          eventId: event.id,
-          eventTitle: event.summary,
-          conflictTime: eventStart.toISOString(),
-          severity: 'high',
-          suggestion: 'Consider rescheduling this event or adjusting travel dates'
-        });
-      }
-
-      // Check for tight schedule conflicts (events too close to travel time)
-      if (this.isTooClose(eventStart, eventEnd, departureBuffer, travelStart)) {
-        conflicts.push({
-          type: 'tight_schedule',
-          eventId: event.id,
-          eventTitle: event.summary,
-          conflictTime: eventStart.toISOString(),
-          severity: 'medium',
-          suggestion: 'Allow more time between this event and travel departure'
-        });
-      }
-
-      if (this.isTooClose(returnBuffer, travelEnd, eventStart, eventEnd)) {
-        conflicts.push({
-          type: 'tight_schedule',
-          eventId: event.id,
-          eventTitle: event.summary,
-          conflictTime: eventStart.toISOString(),
-          severity: 'medium',
-          suggestion: 'Allow more time between travel return and this event'
-        });
-      }
-
-      // Check for travel time conflicts (events in different locations)
-      if (event.location && this.requiresTravelTime(event.location, travelStart, travelEnd)) {
-        conflicts.push({
-          type: 'travel_time',
-          eventId: event.id,
-          eventTitle: event.summary,
-          conflictTime: eventStart.toISOString(),
-          severity: 'low',
-          suggestion: 'Consider travel time to/from this event location'
-        });
-      }
-    }
-
-    return conflicts;
-  }
-
-  private isOverlapping(start1: Date, end1: Date, start2: Date, end2: Date): boolean {
-    return start1 < end2 && start2 < end1;
-  }
-
-  private isTooClose(start1: Date, end1: Date, start2: Date, end2: Date): boolean {
-    const timeDiff = Math.abs(end1.getTime() - start2.getTime());
-    const oneHour = 60 * 60 * 1000;
-    return timeDiff < oneHour;
-  }
-
-  private requiresTravelTime(eventLocation: string, travelStart: Date, travelEnd: Date): boolean {
-    // Simple heuristic: if event location contains airport codes or is far from typical locations
-    const airportCodes = ['airport', 'terminal', 'gate'];
-    const location = eventLocation.toLowerCase();
-    return airportCodes.some(code => location.includes(code));
-  }
-
-  async deleteEvent(eventId: string): Promise<boolean> {
-    try {
-      const response = await fetch(`${this.baseUrl}/calendars/primary/events/${eventId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${this.accessToken}`
-        }
-      });
-
-      return response.ok;
-    } catch (error) {
-      console.error('Error deleting calendar event:', error);
-      return false;
-    }
-  }
-
-  async updateEvent(eventId: string, updates: Partial<CalendarEvent>): Promise<CalendarEvent | null> {
-    try {
-      const response = await fetch(`${this.baseUrl}/calendars/primary/events/${eventId}`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${this.accessToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          summary: updates.summary,
-          description: updates.description,
-          start: updates.start,
-          end: updates.end,
-          location: updates.location
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`Calendar update event error: ${response.status}`);
-      }
-
-      const data = await response.json();
-      return this.transformCalendarEvents([data])[0];
-    } catch (error) {
-      console.error('Error updating calendar event:', error);
-      return null;
+      console.error('Failed to create calendar event:', error)
+      throw error
     }
   }
 }
 ```
 
+### Step 14: Add Type Defination
+
+```ts
+// Flight-related types
+export interface FlightSearchParams {
+  origin: string
+  destination: string
+  departureDate: string
+  returnDate?: string
+  passengers: number
+  class?: 'economy' | 'business' | 'first'
+}
+
+export interface FlightInfo {
+  id: string
+  airline: string
+  flightNumber: string
+  origin: string
+  destination: string
+  departureTime: string
+  arrivalTime: string
+  duration: string
+  price: number
+  currency: string
+  bookingUrl?: string
+  aircraft?: string
+  stops: number
+}
+
+// Hotel-related types
+export interface HotelSearchParams {
+  destination: string
+  checkIn: string
+  checkOut: string
+  guests: number
+  rooms?: number
+  minRating?: number
+  maxPrice?: number
+}
+
+export interface HotelResult {
+  id: string
+  name: string
+  address: string
+  city: string
+  country: string
+  rating: number
+  pricePerNight: number
+  currency: string
+  totalPrice: number
+  amenities: string[]
+  images: string[]
+  bookingUrl?: string
+  description?: string
+  coordinates?: {
+    latitude: number
+    longitude: number
+  }
+}
+
+// Calendar-related types
+export interface CalendarEvent {
+  id: string
+  summary: string
+  description?: string
+  start: {
+    dateTime?: string
+    date?: string
+    timeZone?: string
+  }
+  end: {
+    dateTime?: string
+    date?: string
+    timeZone?: string
+  }
+  location?: string
+}
+
+export interface Conflict {
+  type: 'overlap' | 'tight_schedule' | 'travel_time'
+  eventId: string
+  eventTitle: string
+  conflictTime: string
+  severity: 'low' | 'medium' | 'high'
+  suggestion?: string
+}
+
+// API response types
+export interface AviationstackResponse {
+  data: Array<{
+    flight_date: string
+    flight_status: string
+    departure: {
+      airport: string
+      timezone: string
+      iata: string
+      icao: string
+      terminal: string
+      gate: string
+      delay: number
+      scheduled: string
+      estimated: string
+      actual: string
+      estimated_runway: string
+      actual_runway: string
+    }
+    arrival: {
+      airport: string
+      timezone: string
+      iata: string
+      icao: string
+      terminal: string
+      gate: string
+      baggage: string
+      delay: number
+      scheduled: string
+      estimated: string
+      actual: string
+      estimated_runway: string
+      actual_runway: string
+    }
+    airline: {
+      name: string
+      iata: string
+      icao: string
+    }
+    flight: {
+      number: string
+      iata: string
+      icao: string
+      codeshared: any
+    }
+    aircraft: {
+      registration: string
+      iata: string
+      icao: string
+      icao24: string
+    }
+    live: {
+      updated: string
+      latitude: number
+      longitude: number
+      altitude: number
+      direction: number
+      speed_horizontal: number
+      speed_vertical: number
+      is_ground: boolean
+    }
+  }>
+}
+
+export interface HotelsComResponse {
+  data: {
+    hotels: Array<{
+      id: string
+      name: string
+      address: string
+      city: string
+      country: string
+      rating: number
+      price: {
+        amount: number
+        currency: string
+      }
+      amenities: string[]
+      images: string[]
+      coordinates: {
+        lat: number
+        lng: number
+      }
+      description: string
+    }>
+  }
+}
+
+// Booking-related types
+export interface FlightBookingRequest {
+  flightId: string
+  passengers: PassengerInfo[]
+  contactInfo: ContactInfo
+  paymentInfo?: PaymentInfo
+}
+
+export interface HotelBookingRequest {
+  hotelId: string
+  checkIn: string
+  checkOut: string
+  rooms: number
+  guests: number
+  guestInfo: GuestInfo[]
+  contactInfo: ContactInfo
+  paymentInfo?: PaymentInfo
+}
+
+export interface PassengerInfo {
+  firstName: string
+  lastName: string
+  dateOfBirth: string
+  passportNumber?: string
+  nationality?: string
+}
+
+export interface GuestInfo {
+  firstName: string
+  lastName: string
+  email?: string
+}
+
+export interface ContactInfo {
+  email: string
+  phone: string
+  firstName: string
+  lastName: string
+}
+
+export interface PaymentInfo {
+  cardNumber: string
+  expiryMonth: string
+  expiryYear: string
+  cvv: string
+  cardholderName: string
+  billingAddress: BillingAddress
+}
+
+export interface BillingAddress {
+  street: string
+  city: string
+  state: string
+  zipCode: string
+  country: string
+}
+
+export interface BookingConfirmation {
+  bookingId: string
+  confirmationNumber: string
+  status: 'confirmed' | 'pending' | 'failed'
+  totalPrice: number
+  currency: string
+  bookingDate: string
+  details: FlightBookingDetails | HotelBookingDetails
+}
+
+export interface FlightBookingDetails {
+  type: 'flight'
+  flight: FlightInfo
+  passengers: PassengerInfo[]
+  seatAssignments?: string[]
+}
+
+export interface HotelBookingDetails {
+  type: 'hotel'
+  hotel: HotelResult
+  checkIn: string
+  checkOut: string
+  rooms: number
+  guests: GuestInfo[]
+}
+
+export interface TravelPlan {
+  id: string
+  title: string
+  destinations: string[]
+  startDate: string
+  endDate: string
+  travelers: number
+  budget?: number
+  status: 'planning' | 'booked' | 'completed' | 'cancelled'
+  flights?: BookingConfirmation[]
+  hotels?: BookingConfirmation[]
+  createdAt: string
+  updatedAt: string
+}
+```
 
 ## 🚀 Deployment
 
