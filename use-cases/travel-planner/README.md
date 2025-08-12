@@ -51,7 +51,7 @@ npm install
 cp .dev.vars.example .dev.vars
 ```
 
-## 🔑 API Keys and Environment Variables
+### 🔑 API Keys and Environment Variables
 
 ### Required API Keys
 
@@ -151,10 +151,6 @@ export default new OAuthProvider({
 
 ### Step 5: Create Tools Directory & Index
 
-```bash
-mkdir -p src/tools
-```
-
 Create `src/tools/index.ts`:
 
 ```typescript
@@ -178,7 +174,7 @@ export function registerAllTools(
 }
 ```
 
-### Step 6: Create Flight Tools
+#### Step 6: Create Flight Tools
 
 Create `src/tools/flight.ts`:
 
@@ -190,10 +186,6 @@ import { BookingService } from '../services/booking-service'
 import { Props } from '../utils'
 import { env } from 'cloudflare:workers'
 
-
-/**
- * Registers flight-related tools with the MCP server
- */
 export function registerFlightTools(server: McpServer, props: Props) {
   const flightService = new FlightService(env.AVIATIONSTACK_API_KEY)
   const bookingService = new BookingService(props.accessToken)
@@ -330,9 +322,6 @@ import { BookingService } from '../services/booking-service'
 import { Props } from '../utils'
 import { env } from 'cloudflare:workers'
 
-/**
- * Registers hotel-related tools with the MCP server
- */
 export function registerHotelTools(server: McpServer, props: Props) {
   const hotelService = new HotelService(env.RAPIDAPI_KEY)
   const bookingService = new BookingService(props.accessToken)
@@ -556,7 +545,7 @@ export function registerCalendarTools(server: McpServer, props: Props) {
 }
 ```
 
-### Step 9: Create Travel Plan Tools
+### Step 9: Create Travel Plan Tools (Optional)
 
 Create `src/tools/travel-plan.ts`:
 
@@ -790,15 +779,9 @@ export function registerTravelPlanTools(server: McpServer, props: Props) {
 }
 ```
 
-### Step 10: Create Service Layer
+### Step 10: Create Flight Service
 
-Create the service directory and implement the service classes:
-
-```bash
-mkdir -p src/services
-```
-
-#### Create `src/services/flight-service.ts`:
+Create `src/services/flight-service.ts`:
 
 ```typescript
 import { FlightSearchParams, FlightInfo, AviationstackResponse } from '../types/index.js';
@@ -1062,7 +1045,7 @@ export class FlightService {
 }
 ```
 
-## Calender Service
+#### Calender Service
 
 ```typescript
  import { CalendarEvent, Conflict } from '../types/index.js';
@@ -1324,7 +1307,7 @@ export class CalendarService {
 }
 ```
 
-### Step : Booking service
+### Step 12: Create Booking Service (Optional)
 
 ```typescript
 import { CalendarEvent, Conflict } from '../types/index.js';
@@ -1586,33 +1569,23 @@ export class CalendarService {
 }
 ```
 
-### Step 12: Deploying to Cloudflare Workers
 
-Deploy your MCP server:
+## 🚀 Final Steps
 
-```bash
-# Deploy to Cloudflare Workers
-npm run deploy
-```
+1. **Deploying to Cloudflare Workers**:
+
+  ```bash
+  # Deploy to Cloudflare Workers
+  npm run deploy
+  ```
 
 After deployment, your MCP server will be available at:
 `https://your-worker-name.your-subdomain.workers.dev`
 
-## 🚀 Final Steps
-
-1. **Upload your environment variables to Cloudflare**:
+2. **Upload your environment variables to Cloudflare**:
    ```bash
    wrangler secret bulk .dev.vars
    ```
-
-2. **Test your MCP server** by connecting it to an MCP-compatible AI assistant
-
-
-## 📚 Additional Resources
-
-- [Cloudflare Workers Documentation](https://developers.cloudflare.com/workers/)
-- [MCP Protocol Specification](https://modelcontextprotocol.github.io/)
-- [Google Calendar API Documentation](https://developers.google.com/calendar)
 
 
 ## 🧪 Testing with Claude
@@ -1659,5 +1632,13 @@ Check if I have any conflicts for my December 15-22 trip
 - Verify `wrangler.jsonc` configuration
 - Check Cloudflare account permissions
 - Ensure environment variables are set in Cloudflare dashboard
+
+
+
+## 📚 Additional Resources
+
+- [Cloudflare Workers Documentation](https://developers.cloudflare.com/workers/)
+- [MCP Protocol Specification](https://modelcontextprotocol.github.io/)
+- [Google Calendar API Documentation](https://developers.google.com/calendar)
 
 **🎉 Congratulations!** You've built a complete MCP server that enables Claude to search flights, manage travel plans, and coordinate bookings. Your server demonstrates the power of the Model Context Protocol for creating AI-native integrations.
