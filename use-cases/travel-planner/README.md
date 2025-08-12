@@ -1691,7 +1691,9 @@ export class BookingService {
 }
 ```
 
-### Step 14: Add Type Definition
+### Step 14: Create Type Definition
+
+Create `src/types/index.ts`:
 
 ```ts
 // Flight-related types
