@@ -174,7 +174,7 @@ export function registerAllTools(
 }
 ```
 
-#### Step 6: Create Flight Tools
+### Step 6: Create Flight Tools
 
 Create `src/tools/flight.ts`:
 
