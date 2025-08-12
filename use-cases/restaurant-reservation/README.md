@@ -49,7 +49,7 @@ YELP_CLIENT_ID=your_actual_yelp_client_id
 ```typescript
 import { McpAgent } from "agents/mcp";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { registerAllTools } from './tools/index';
+import { registerAllTools } from './tools';
 
 export class MyMCP extends McpAgent<Env, Record<string, never>> {
   server = new McpServer({
