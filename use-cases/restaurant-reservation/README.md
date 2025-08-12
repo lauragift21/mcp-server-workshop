@@ -29,17 +29,18 @@ cp .dev.vars.example .dev.vars
 
 ### Step 3: Environment Variables
 
+**Get your Yelp API Key:**
+
+1. Visit [Yelp Fusion](https://business.yelp.com/data/products/fusion/)
+2. Create a free account and app, you get 30days free trial 
+3. Copy your API key and Client ID to `.dev.vars`
+
 Add your Yelp API key and client ID to the `.dev.vars` file:
 
 ```
 YELP_API_KEY=your_actual_yelp_api_key
 YELP_CLIENT_ID=your_actual_yelp_client_id
 ```
-
-**Get your Yelp API Key:**
-1. Visit [Yelp Fusion](https://business.yelp.com/data/products/fusion/)
-2. Create a free account and app, you get 30days free trial 
-3. Copy your API key and Client ID to `.dev.vars`
 
 ## 📁 Implementation Code
 
@@ -56,7 +57,7 @@ export class MyMCP extends McpAgent<Env, Record<string, never>> {
     version: "1.0.0",
   });
 
-  async init() {
+	async init() {
     // Register all tools using the tools directory
     registerAllTools(this.server);	
   }		
@@ -117,6 +118,7 @@ export function registerRestaurantTools(server: McpServer) {
   }
   const restaurantService = new RestaurantService(apiKey);
 
+  // Tool to search restaurants
   server.tool(
     'search_restaurants',
     'Search for restaurants with optional filters for location, cuisine, price level, and rating',
@@ -140,7 +142,7 @@ export function registerRestaurantTools(server: McpServer) {
           };
         }
 
-        const formattedResults = restaurants.map(r => restaurantService.formatRestaurant(r)).join("\n\n");
+        const formattedResults = restaurants.map(r => restaurantService.formatRestaurant(r)).join("\n");
 
         return {
           content: [{
@@ -159,9 +161,10 @@ export function registerRestaurantTools(server: McpServer) {
     }
   );
 
+  // Tool to get detailed restaurant information
   server.tool(
     'get_restaurant_details',
-    'Get detailed information about a specific restaurant by ID',
+    'Get detailed information about a specific restaurant including contact info and description',
     {
       restaurantId: z.string().describe('The unique ID of the restaurant')
     },
@@ -181,14 +184,14 @@ export function registerRestaurantTools(server: McpServer) {
         return {
           content: [{
             type: "text",
-            text: restaurantService.formatRestaurant(restaurant)
+            text: restaurantService.formatRestaurantDetails(restaurant)
           }]
         };
       } catch (error) {
         return {
           content: [{
             type: "text",
-            text: `❌ Error fetching restaurant details: ${error instanceof Error ? error.message : 'Unknown error'}`
+            text: `❌ Error getting restaurant details: ${error instanceof Error ? error.message : 'Unknown error'}`
           }]
         };
       }
@@ -208,14 +211,18 @@ import { ReservationService } from '../services/reservation-service';
 import { RestaurantService } from '../services/restaurant-service';
 import { env } from 'cloudflare:workers';
 
+/**
+ * Registers reservation management tools with the MCP server
+ */
 export function registerReservationTools(server: McpServer) {
   const apiKey = env.YELP_API_KEY;
   if (!apiKey) {
     throw new Error('YELP_API_KEY environment variable is required');
   }
-  const reservationService = new ReservationService();
+  const reservationService = ReservationService.getInstance();
   const restaurantService = new RestaurantService(apiKey);
 
+  // Tool to check restaurant availability
   server.tool(
     'check_availability',
     'Check if a restaurant has availability for a specific date, time, and party size',
@@ -248,7 +255,8 @@ export function registerReservationTools(server: McpServer) {
         const message = `${statusIcon} **${restaurant.name}** ${availability.message}\n\n` +
                        `📅 Date: ${date}\n` +
                        `🕐 Time: ${time}\n` +
-                       `👥 Party size: ${partySize}`;
+                       `👥 Party Size: ${partySize}\n\n` +
+                       `Other available times: ${availability.alternativeTimes.join(", ")}`;
 
         return {
           content: [{
@@ -267,20 +275,21 @@ export function registerReservationTools(server: McpServer) {
     }
   );
 
+  // Tool to make a reservation
   server.tool(
     'make_reservation',
-    'Make a restaurant reservation with customer details',
+    'Make a restaurant reservation with customer details and special requests',
     {
       restaurantId: z.string().describe('The unique ID of the restaurant'),
-      customerName: z.string().describe('Full name of the customer'),
-      customerEmail: z.string().email().describe('Customer email address'),
-      customerPhone: z.string().describe('Customer phone number'),
       date: z.string().describe('Reservation date (e.g., "2024-08-15")'),
       time: z.string().describe('Reservation time (e.g., "7:00 PM")'),
       partySize: z.number().min(1).max(20).describe('Number of people in the party'),
+      customerName: z.string().describe('Customer full name'),
+      customerEmail: z.string().describe('Customer email address'),
+      customerPhone: z.string().describe('Customer phone number'),
       specialRequests: z.string().optional().describe('Any special requests or dietary restrictions')
     },
-    async ({ restaurantId, customerName, customerEmail, customerPhone, date, time, partySize, specialRequests }) => {
+    async ({ restaurantId, date, time, partySize, customerName, customerEmail, customerPhone, specialRequests }) => {
       try {
         const restaurant = await restaurantService.getRestaurantById(restaurantId);
         if (!restaurant) {
@@ -292,44 +301,24 @@ export function registerReservationTools(server: McpServer) {
           };
         }
 
-        const availability = await reservationService.checkAvailability({
-          restaurantId,
-          date,
-          time,
-          partySize
-        });
-
-        if (!availability.isAvailable) {
-          return {
-            content: [{
-              type: "text",
-              text: `❌ **${restaurant.name}** ${availability.message}`
-            }]
-          };
-        }
-
         const reservation = await reservationService.makeReservation({
           restaurantId,
-          customerName,
-          customerEmail,
-          customerPhone,
           date,
           time,
           partySize,
+          customerName,
+          customerEmail,
+          customerPhone,
           specialRequests
         });
 
-        const confirmationMessage = `🎉 **Reservation Confirmed!**\n\n` +
-                                   `${reservationService.formatReservation(reservation)}\n\n` +
-                                   `📍 **${restaurant.name}**\n` +
-                                   `${restaurant.address}\n` +
-                                   `${restaurant.phone ? `📞 ${restaurant.phone}` : ''}\n\n` +
-                                   `💡 Please arrive 15 minutes early and bring a valid ID.`;
+        // Update the reservation with restaurant name
+        reservation.restaurantName = restaurant.name;
 
         return {
           content: [{
             type: "text",
-            text: confirmationMessage
+            text: reservationService.formatReservationConfirmation(reservation, restaurant.phone)
           }]
         };
       } catch (error) {
@@ -343,51 +332,109 @@ export function registerReservationTools(server: McpServer) {
     }
   );
 
+  // Tool to view customer reservations
+  server.tool(
+    'view_reservations',
+    'View all reservations for a customer by their email address',
+    {
+      customerEmail: z.string().describe('Customer email address to look up reservations')
+    },
+    async ({ customerEmail }) => {
+      try {
+        const reservations = await reservationService.getReservationsByEmail(customerEmail);
+
+        if (reservations.length === 0) {
+          return {
+            content: [{
+              type: "text",
+              text: `📋 No reservations found for ${customerEmail}`
+            }]
+          };
+        }
+
+        // For each reservation, fetch the restaurant details to ensure we have the name
+        for (const reservation of reservations) {
+          if (!reservation.restaurantName) {
+            const restaurant = await restaurantService.getRestaurantById(reservation.restaurantId);
+            if (restaurant) {
+              reservation.restaurantName = restaurant.name;
+            } else {
+              reservation.restaurantName = "Unknown Restaurant";
+            }
+          }
+        }
+
+        const formattedReservations = reservations.map(r => 
+          reservationService.formatReservation(r)
+        ).join("\n\n");
+
+        return {
+          content: [{
+            type: "text",
+            text: `📋 **Your Reservations:**\n\n${formattedReservations}`
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{
+            type: "text",
+            text: `❌ Error retrieving reservations: ${error instanceof Error ? error.message : 'Unknown error'}`
+          }]
+        };
+      }
+    }
+  );
+
   // Tool to cancel a reservation
   server.tool(
     'cancel_reservation',
-    'Cancel an existing restaurant reservation',
+    'Cancel an existing reservation using the reservation ID and customer email',
     {
-      reservationId: z.string().describe('The unique ID of the reservation to cancel')
+      reservationId: z.string().describe('The reservation confirmation ID'),
+      customerEmail: z.string().describe('Customer email address for verification')
     },
-    async ({ reservationId }) => {
+    async ({ reservationId, customerEmail }) => {
       try {
-        const reservation = await reservationService.getReservation(reservationId);
-        if (!reservation) {
-          return {
-            content: [{
-              type: "text",
-              text: "❌ Reservation not found. Please check the reservation ID."
-            }]
-          };
-        }
-
-        if (reservation.status === 'cancelled') {
-          return {
-            content: [{
-              type: "text",
-              text: "ℹ️ This reservation has already been cancelled."
-            }]
-          };
-        }
-
-        const success = await reservationService.cancelReservation(reservationId);
+        // First, get the reservation to check if it exists
+        const existingReservation = await reservationService.getReservationByIdAndEmail(reservationId, customerEmail);
         
-        if (success) {
+        if (!existingReservation) {
           return {
             content: [{
               type: "text",
-              text: `✅ **Reservation Cancelled Successfully**\n\n${reservationService.formatReservation(reservation)}\n\n💡 You will receive a cancellation confirmation email shortly.`
-            }]
-          };
-        } else {
-          return {
-            content: [{
-              type: "text",
-              text: "❌ Failed to cancel reservation. Please try again or contact support."
+              text: "❌ Reservation not found or email doesn't match. Please check your reservation ID and email address."
             }]
           };
         }
+        
+        // If the restaurant name is missing, try to get it
+        if (!existingReservation.restaurantName) {
+          const restaurant = await restaurantService.getRestaurantById(existingReservation.restaurantId);
+          if (restaurant) {
+            existingReservation.restaurantName = restaurant.name;
+          } else {
+            existingReservation.restaurantName = "Unknown Restaurant";
+          }
+        }
+        
+        // Now cancel the reservation
+        const cancelledReservation = await reservationService.cancelReservation(reservationId, customerEmail);
+
+        if (!cancelledReservation) {
+          return {
+            content: [{
+              type: "text",
+              text: "❌ Error cancelling reservation. Please try again."
+            }]
+          };
+        }
+
+        return {
+          content: [{
+            type: "text",
+            text: reservationService.formatCancellationConfirmation(cancelledReservation)
+          }]
+        };
       } catch (error) {
         return {
           content: [{
@@ -406,51 +453,118 @@ export function registerReservationTools(server: McpServer) {
 Create `src/types/index.ts`:
 
 ```typescript
+// Restaurant data types
 export interface Restaurant {
-  id: string;
-  name: string;
-  cuisine: string;
-  location: string;
-  priceLevel: number;
-  rating: number;
-  phone?: string;
-  address?: string;
-  imageUrl?: string;
-  reviewCount?: number;
-}
-
-export interface SearchFilters {
-  location?: string;
-  cuisine?: string;
-  priceLevel?: number;
-  minRating?: number;
+	id: string;
+	name: string;
+	cuisine: string;
+	location: string;
+	rating: number;
+	priceLevel: number;
+	phone?: string;
+	website?: string;
+	imageUrl?: string;
+	description?: string;
 }
 
 export interface Reservation {
-  id: string;
-  restaurantId: string;
-  customerName: string;
-  customerEmail: string;
-  customerPhone: string;
-  date: string;
-  time: string;
-  partySize: number;
-  specialRequests?: string;
-  status: 'confirmed' | 'cancelled' | 'pending';
-  createdAt: string;
+	id: string;
+	restaurantId: string;
+	restaurantName: string;
+	date: string;
+	time: string;
+	partySize: number;
+	customerName: string;
+	customerEmail: string;
+	customerPhone: string;
+	status: "confirmed" | "pending" | "cancelled";
+	specialRequests?: string;
+}
+
+// Search and filter types
+export interface RestaurantSearchFilters {
+	location?: string;
+	cuisine?: string;
+	priceLevel?: number;
+	minRating?: number;
 }
 
 export interface AvailabilityRequest {
-  restaurantId: string;
-  date: string;
-  time: string;
-  partySize: number;
+	restaurantId: string;
+	date: string;
+	time: string;
+	partySize: number;
 }
 
-export interface AvailabilityResponse {
-  isAvailable: boolean;
-  message: string;
-  alternativeTimes?: string[];
+export interface ReservationRequest {
+	restaurantId: string;
+	date: string;
+	time: string;
+	partySize: number;
+	customerName: string;
+	customerEmail: string;
+	customerPhone: string;
+	specialRequests?: string;
+}
+
+// Yelp API response types
+export interface YelpBusiness {
+	id: string;
+	alias: string;
+	name: string;
+	image_url: string;
+	is_closed: boolean;
+	url: string;
+	review_count: number;
+	categories: Array<{
+		alias: string;
+		title: string;
+	}>;
+	rating: number;
+	coordinates: {
+		latitude: number;
+		longitude: number;
+	};
+	transactions: string[];
+	price?: string;
+	location: {
+		address1: string;
+		address2?: string;
+		address3?: string;
+		city: string;
+		zip_code: string;
+		country: string;
+		state: string;
+		display_address: string[];
+	};
+	phone: string;
+	display_phone: string;
+	distance?: number;
+}
+
+export interface YelpSearchResponse {
+	businesses: YelpBusiness[];
+	total: number;
+	region: {
+		center: {
+			longitude: number;
+			latitude: number;
+		};
+	};
+}
+
+export interface YelpBusinessDetails extends YelpBusiness {
+	hours?: Array<{
+		open: Array<{
+			is_overnight: boolean;
+			start: string;
+			end: string;
+			day: number;
+		}>;
+		hours_type: string;
+		is_open_now: boolean;
+	}>;
+	photos: string[];
 }
 ```
 
@@ -459,8 +573,17 @@ export interface AvailabilityResponse {
 Create `src/services/restaurant-service.ts`:
 
 ```typescript
-import { Restaurant, SearchFilters } from '../types';
+import type {
+  Restaurant,
+  RestaurantSearchFilters,
+  YelpBusiness,
+  YelpSearchResponse,
+  YelpBusinessDetails,
+} from '../types';
 
+/**
+ * Service for restaurant discovery and management using Yelp Fusion API
+ */
 export class RestaurantService {
   private apiKey: string;
   private baseUrl = 'https://api.yelp.com/v3';
@@ -469,99 +592,168 @@ export class RestaurantService {
     this.apiKey = apiKey;
   }
 
-  async searchRestaurants(filters: SearchFilters): Promise<Restaurant[]> {
+  /**
+   * Make authenticated request to Yelp API
+   */
+  private async makeYelpRequest(endpoint: string): Promise<any> {
+    const response = await fetch(`${this.baseUrl}${endpoint}`, {
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        `Yelp API error: ${response.status} ${response.statusText}`
+      );
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Convert Yelp business to our Restaurant interface
+   */
+  private convertYelpToRestaurant(yelpBusiness: YelpBusiness): Restaurant {
+    // Extract primary cuisine from categories
+    const primaryCuisine =
+      yelpBusiness.categories.length > 0
+        ? yelpBusiness.categories[0].title
+        : 'Restaurant';
+
+    // Convert Yelp price ($, $$, $$$, $$$$) to numeric level (1-4)
+    const priceLevel = yelpBusiness.price ? yelpBusiness.price.length : 2;
+
+    // Create location string from address
+    const location = yelpBusiness.location.display_address.join(', ');
+
+    return {
+      id: yelpBusiness.id,
+      name: yelpBusiness.name,
+      cuisine: primaryCuisine,
+      location: location,
+      rating: yelpBusiness.rating,
+      priceLevel: priceLevel,
+      phone: yelpBusiness.display_phone,
+      website: yelpBusiness.url,
+      imageUrl: yelpBusiness.image_url,
+      description: `${primaryCuisine} restaurant with ${yelpBusiness.review_count} reviews`,
+    };
+  }
+
+  /**
+   * Search restaurants with optional filters using Yelp API
+   */
+  async searchRestaurants(
+    filters: RestaurantSearchFilters
+  ): Promise<Restaurant[]> {
     try {
-      const params = new URLSearchParams({
-        categories: 'restaurants',
-        limit: '20',
-        sort_by: 'rating'
-      });
+      // Build Yelp API search parameters
+      const params = new URLSearchParams();
 
-      if (filters.location) params.append('location', filters.location);
-      if (filters.cuisine) params.append('categories', `restaurants,${filters.cuisine.toLowerCase()}`);
-      if (filters.priceLevel) params.append('price', '1,2,3,4'.split(',').slice(0, filters.priceLevel).join(','));
+      // Default search parameters
+      params.append('categories', 'restaurants');
+      params.append('limit', '20');
+      params.append('sort_by', 'best_match');
 
-      const response = await fetch(`${this.baseUrl}/businesses/search?${params}`, {
-        headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      // Location is required for Yelp API
+      const location = filters.location || 'San Francisco, CA';
+      params.append('location', location);
 
-      if (!response.ok) {
-        throw new Error(`Yelp API error: ${response.status}`);
+      // Add cuisine filter if specified
+      if (filters.cuisine) {
+        // Map common cuisine types to Yelp categories
+        const cuisineMap: { [key: string]: string } = {
+          italian: 'italian',
+          japanese: 'japanese',
+          french: 'french',
+          indian: 'indpak',
+          chinese: 'chinese',
+          mexican: 'mexican',
+          american: 'newamerican',
+          thai: 'thai',
+          mediterranean: 'mediterranean',
+        };
+
+        const yelpCategory =
+          cuisineMap[filters.cuisine.toLowerCase()] ||
+          filters.cuisine.toLowerCase();
+        params.set('categories', yelpCategory);
       }
 
-      const data = await response.json();
-      const restaurants = data.businesses?.map((business: any) => ({
-        id: business.id,
-        name: business.name,
-        cuisine: business.categories?.[0]?.title || 'Restaurant',
-        location: business.location?.display_address?.join(', ') || 'Unknown',
-        priceLevel: business.price?.length || 2,
-        rating: business.rating || 0,
-        phone: business.phone,
-        address: business.location?.display_address?.join(', '),
-        imageUrl: business.image_url,
-        reviewCount: business.review_count
-      })) || [];
+      // Add price filter if specified
+      if (filters.priceLevel) {
+        // Convert our 1-4 scale to Yelp's 1-4 scale
+        const priceFilter = Array.from(
+          { length: filters.priceLevel },
+          (_, i) => i + 1
+        ).join(',');
+        params.append('price', priceFilter);
+      }
 
-      // Apply rating filter
-      return filters.minRating 
-        ? restaurants.filter((r: Restaurant) => r.rating >= filters.minRating!)
-        : restaurants;
+      const response: YelpSearchResponse = await this.makeYelpRequest(
+        `/businesses/search?${params.toString()}`
+      );
 
+      // Convert Yelp businesses to our Restaurant format
+      let restaurants = response.businesses.map((business) =>
+        this.convertYelpToRestaurant(business)
+      );
+
+      // Apply minimum rating filter (Yelp API doesn't support this directly)
+      if (filters.minRating) {
+        restaurants = restaurants.filter((r) => r.rating >= filters.minRating!);
+      }
+
+      return restaurants;
     } catch (error) {
       console.error('Error searching restaurants:', error);
       throw new Error(
-        `Failed to search restaurants: ${error instanceof Error ? error.message : 'Unknown error'}`
+        `Failed to search restaurants: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`
       );
     }
   }
 
-  async getRestaurantById(id: string): Promise<Restaurant | null> {
+  /**
+   * Get restaurant by ID using Yelp API
+   */
+  async getRestaurantById(restaurantId: string): Promise<Restaurant | null> {
     try {
-      const response = await fetch(`${this.baseUrl}/businesses/${id}`, {
-        headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        return null;
-      }
-
-      const business = await response.json();
-      return {
-        id: business.id,
-        name: business.name,
-        cuisine: business.categories?.[0]?.title || 'Restaurant',
-        location: business.location?.display_address?.join(', ') || 'Unknown',
-        priceLevel: business.price?.length || 2,
-        rating: business.rating || 0,
-        phone: business.phone,
-        address: business.location?.display_address?.join(', '),
-        imageUrl: business.image_url,
-        reviewCount: business.review_count
-      };
-
+      const response: YelpBusinessDetails = await this.makeYelpRequest(
+        `/businesses/${restaurantId}`
+      );
+      return this.convertYelpToRestaurant(response);
     } catch (error) {
-      console.error('Error fetching restaurant details:', error);
+      console.error('Error getting restaurant by ID:', error);
       return null;
     }
   }
 
+  /**
+   * Get restaurants by location (default search)
+   */
+  async getAllRestaurants(
+    location: string = 'San Francisco, CA'
+  ): Promise<Restaurant[]> {
+    return this.searchRestaurants({ location });
+  }
+
+  /**
+   * Format restaurant for display
+   */
   formatRestaurant(restaurant: Restaurant): string {
-    const priceSymbols = '$'.repeat(restaurant.priceLevel);
-    const stars = '⭐'.repeat(Math.floor(restaurant.rating));
-    
-    return `🍽️ **${restaurant.name}**
-📍 ${restaurant.location}
-🍴 ${restaurant.cuisine} | ${priceSymbols} | ${stars} (${restaurant.rating}/5)
-${restaurant.phone ? `📞 ${restaurant.phone}` : ''}
-${restaurant.reviewCount ? `👥 ${restaurant.reviewCount} reviews` : ''}
-🆔 ID: ${restaurant.id}`;
+    return (
+      `🍽️ ${restaurant.name}\n\n` +
+      `Id: ${restaurant.id}\n` +
+      `Cuisine: ${restaurant.cuisine}\n` +
+      `Location: ${restaurant.location}\n` +
+      `Rating: ${restaurant.rating}/5 ⭐\n` +
+      `Price: $${'$'.repeat(restaurant.priceLevel)}\n` +
+      `${restaurant.description || ''}`
+    );
   }
 
   /**
@@ -587,7 +779,7 @@ ${restaurant.reviewCount ? `👥 ${restaurant.reviewCount} reviews` : ''}
 Create `src/services/reservation-service.ts`:
 
 ```typescript
-import { Reservation, AvailabilityRequest, ReservationRequest } from '../types';
+import type { Reservation, AvailabilityRequest, ReservationRequest } from '../types';
 
 /**
  * Service for managing restaurant reservations
@@ -747,7 +939,6 @@ export class ReservationService {
 }
 ```
 
-
 ## 🚀 Deployment
 
 ### Step 5: Deploy to Cloudflare Workers
@@ -762,7 +953,7 @@ npm run deploy
 wrangler secret bulk .dev.vars
 ```
 
-### Step 6: Connect to MCP Clients
+### Step 6: Connect to MCP Client
 
 #### Connect to Cloudflare AI Playground
 
