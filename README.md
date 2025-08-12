@@ -25,7 +25,7 @@ You'll create your own MCP server that connects to Claude (or any MCP-compatible
 We'll vote and build **one live** during the workshop—but you can explore and finish any of these on your own:
 
 - ✈️ [**Real-time Travel Planner**](./use-cases/travel-planner/) – Claude integrates with your calendar & travel APIs to plan trips
-- 🍽 [**Restaurant Reservation**](./use-cases/restaurant-reservation/) – Claude connects to a booking platform like OpenTable
+- 🍽 [**Restaurant Reservation**](./use-cases/restaurant-reservation/) – Claude connects to a booking platform like Yelp or OpenTable
 - 📝 [**AI-Powered Meeting Summary**](./use-cases/meeting-summary/) – Claude summarizes notes and creates Jira tasks from Google Docs
 
 ---

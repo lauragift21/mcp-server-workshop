@@ -11,7 +11,7 @@ We've prepared three complete MCP server examples that demonstrate different cap
 - Checks flights, hotels, and calendar conflicts
 
 ### 2. **Restaurant Reservation**
-- Claude connects to a booking platform like OpenTable
+- Claude connects to a booking platform like Yelp or OpenTable
 - Manages restaurant bookings and availability
 
 ### 3. **AI-Powered Meeting Summary**

@@ -132,7 +132,8 @@ Help me plan a trip to Paris. Can you search for flights and hotels?
 
 **Restaurant Reservation:**
 ```
-Find me a restaurant in downtown for dinner tonight and make a reservation.
+Find me a restaurant in downtown for dinner tonight.
+
 ```
 
 **Meeting Summary:**
