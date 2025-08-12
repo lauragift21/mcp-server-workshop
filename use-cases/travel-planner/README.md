@@ -1045,7 +1045,7 @@ export class FlightService {
 }
 ```
 
-#### Calender Service
+### Step 12: Create Calendar Service
 
 ```typescript
  import { CalendarEvent, Conflict } from '../types/index.js';
@@ -1307,7 +1307,7 @@ export class CalendarService {
 }
 ```
 
-### Step 12: Create Booking Service (Optional)
+### Step 13: Create Booking Service (Optional)
 
 ```typescript
 import { CalendarEvent, Conflict } from '../types/index.js';
@@ -1583,9 +1583,9 @@ After deployment, your MCP server will be available at:
 `https://your-worker-name.your-subdomain.workers.dev`
 
 2. **Upload your environment variables to Cloudflare**:
-   ```bash
-   wrangler secret bulk .dev.vars
-   ```
+  ```bash
+  wrangler secret bulk .dev.vars
+  ```
 
 
 ## 🧪 Testing with Claude
