@@ -1,126 +1,1663 @@
-# Model Context Protocol (MCP) Server + Google OAuth
+# Real-time Travel Planner MCP Server
 
-This is a [Model Context Protocol (MCP)](https://modelcontextprotocol.io/introduction) server that supports remote MCP connections, with Google OAuth built-in.
+An MCP server for flight search, hotel booking, and travel planning using Cloudflare Workers and travel APIs, designed to work with Claude and other MCP clients.
 
-You can deploy it to your own Cloudflare account, and after you create your own Google Cloud OAuth client app, you'll have a fully functional remote MCP server that you can build off. Users will be able to connect to your MCP server by signing in with their Google account.
+## 🎯 What You'll Build
 
-You can use this as a reference example for how to integrate other OAuth providers with an MCP server deployed to Cloudflare, using the [`workers-oauth-provider` library](https://github.com/cloudflare/workers-oauth-provider).
+A fully functional MCP server with 8 tools organized into 4 categories:
 
-The MCP server (powered by [Cloudflare Workers](https://developers.cloudflare.com/workers/)): 
+### ✈️ Flight Tools
+- `search_flights` - Search for flights between airports with filters
+- `book_flight` - Book flights with passenger information
 
-* Acts as OAuth _Server_ to your MCP clients
-* Acts as OAuth _Client_ to your _real_ OAuth server (in this case, Google)
+### 🏨 Hotel Tools  
+- `search_hotels` - Find hotels by destination, dates, and preferences
+- `book_hotel` - Reserve hotels with guest details
 
-## Getting Started
+### 📅 Calendar Tools
+- `check_calendar_conflicts` - Check for scheduling conflicts with travel dates
 
-Clone the repo & install dependencies: `npm install`
+### 📋 Travel Plan Tools (Optional)
+- `create_travel_plan` - Create new travel plans with destinations and budget
+- `get_travel_plan` - Retrieve existing travel plan details
+- `book_trip` - Book complete trips with flights and hotels together
 
-### For Production
-Create a new [Google Cloud OAuth App](https://cloud.google.com/iam/docs/workforce-manage-oauth-app): 
-- For the Homepage URL, specify `https://mcp-google-oauth.<your-subdomain>.workers.dev`
-- For the Authorization callback URL, specify `https://mcp-google-oauth.<your-subdomain>.workers.dev/callback`
-- Note your Client ID and generate a Client secret. 
-- Set secrets via Wrangler
+*Note: These tools are optional and can be excluded if you prefer a simpler implementation focusing only on flights, hotels, and calendar integration.*
+
+
+## 📋 Prerequisites
+
+Before you begin, ensure you have:
+
+- **Aviationstack API Key** (from [Aviationstack](https://aviationstack.com/), free tier: 1,000 requests/month)
+- **RapidAPI Key** (from [RapidAPI](https://rapidapi.com/) for Hotels.com API)
+- **Google Cloud Console Project** with Calendar API enabled (from [Google Cloud Console](https://console.cloud.google.com/))
+
+## 🔧 Step-by-Step Setup
+
+### Step 1: Navigate to the Project Directory
+
+Navigate to the project directory:
+
 ```bash
-wrangler secret put GOOGLE_CLIENT_ID
-wrangler secret put GOOGLE_CLIENT_SECRET
-wrangler secret put COOKIE_ENCRYPTION_KEY # add any random string here e.g. openssl rand -hex 32
-wrangler secret put HOSTED_DOMAIN # optional: use this when restrict google account domain
+cd use-cases/travel-planner
 ```
-#### Set up a KV namespace
-- Create the KV namespace: 
-`wrangler kv:namespace create "OAUTH_KV"`
-- Update the Wrangler file with the KV ID
 
-#### Deploy & Test
-Deploy the MCP server to make it available on your workers.dev domain 
-` wrangler deploy`
+### Step 2: Install Dependencies & Copy Example Variables
 
-Test the remote server using [Inspector](https://modelcontextprotocol.io/docs/tools/inspector): 
+```bash
+npm install
 
+cp .dev.vars.example .dev.vars
 ```
-npx @modelcontextprotocol/inspector@latest
+
+## 🔑 API Keys and Environment Variables
+
+### Required API Keys
+
+This project requires several API keys:
+
+1. **Aviationstack API Key**: For flight search functionality
+   - Sign up at [aviationstack.com](https://aviationstack.com/)
+   - Free tier available for development
+
+2. **RapidAPI Key**: For Hotels.com API access
+   - Sign up at [RapidAPI](https://rapidapi.com/)
+   - Subscribe to the Hotels.com API
+
+3. **Create a new Google Cloud OAuth App with Calendar API enabled**:
+   - Navigate to the [Google Cloud Console](https://console.cloud.google.com/)
+   - Create a new project or select an existing one
+   - Enable the Google Calendar API
+   - Go to APIs & Services > Credentials
+   - Click "Create Credentials" > "OAuth client ID"
+   - Set the Homepage URL to: `https://travel-planner.<your-subdomain>.workers.dev`
+   - Add Authorization callback URL: `https://travel-planner.<your-subdomain>.workers.dev/callback`
+   - Note your Client ID and generate a Client Secret
+
+4. **Update the `.dev.vars` file** in the project root with the following variables:
+   ```
+   # Google OAuth credentials
+   GOOGLE_CLIENT_ID=your_client_id_here
+   GOOGLE_CLIENT_SECRET=your_client_secret_here
+   COOKIE_ENCRYPTION_KEY=your_encryption_key_here
+   HOSTED_DOMAIN=optional_domain_restriction
+   
+   # API Keys for travel services
+   AVIATIONSTACK_API_KEY=your_api_key_here
+   RAPIDAPI_KEY=your_api_key_here
+   ```
+
+#### Security Considerations
+
+- The `COOKIE_ENCRYPTION_KEY` should be a secure random string (32+ characters)
+- Use `openssl rand -hex 32` to generate a secure encryption key
+- Never commit your `.dev.vars` file to version control
+- Use environment-specific secrets for different deployment environments
+
+
+### Step 3: Set up KV namespace
+
+1. **Set up KV namespace**:
+   ```bash
+   # Create the KV namespace for OAuth storage
+   wrangler kv namespace create "OAUTH_KV"
+   ```
+
+2. **Update your `wrangler.jsonc` file** with the KV namespace ID:
+   ```json
+   "kv_namespaces": [
+     {
+       "binding": "OAUTH_KV",
+       "id": "your_kv_namespace_id_here"
+     }
+   ]
+   ```
+
+## 📁 Implementation Code
+
+### Step 4: Open `src/index.ts` and replace with the following:
+
+```typescript
+import OAuthProvider from '@cloudflare/workers-oauth-provider'
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { McpAgent } from 'agents/mcp'
+import { GoogleHandler } from './google-handler.js'
+import { registerAllTools } from './tools/index'
+import { Props } from './utils'
+
+export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
+  server = new McpServer({
+    name: 'Travel Planner MCP',
+    version: '1.0.0',
+  })
+
+  async init() {
+    // Register all tools using the tools directory
+    const props = this.props as Props
+    registerAllTools(this.server, props)
+  }
+}
+
+export default new OAuthProvider({
+  apiHandler: MyMCP.mount('/sse') as any,
+  apiRoute: '/sse',
+  authorizeEndpoint: '/authorize',
+  clientRegistrationEndpoint: '/register',
+  defaultHandler: GoogleHandler as any,
+  tokenEndpoint: '/token',
+});
 ```
-Enter `https://mcp-google-oauth.<your-subdomain>.workers.dev/sse` and hit connect. Once you go through the authentication flow, you'll see the Tools working: 
 
-<img width="640" alt="image" src="https://github.com/user-attachments/assets/7973f392-0a9d-4712-b679-6dd23f824287" />
+### Step 5: Create Tools Directory & Index
 
-You now have a remote MCP server deployed! 
-
-### Access Control
-
-This MCP server uses Google Cloud OAuth for authentication. All authenticated Google users can access basic tools like "add". When you restrict users with hosted domain, set `HOSTED_DOMAIN` env.
-
-### Access the remote MCP server from Claude Desktop
-
-Open Claude Desktop and navigate to Settings -> Developer -> Edit Config. This opens the configuration file that controls which MCP servers Claude can access.
-
-Replace the content with the following configuration. Once you restart Claude Desktop, a browser window will open showing your OAuth login page. Complete the authentication flow to grant Claude access to your MCP server. After you grant access, the tools will become available for you to use. 
-
+```bash
+mkdir -p src/tools
 ```
-{
-  "mcpServers": {
-    "math": {
-      "command": "npx",
-      "args": [
-        "mcp-remote",
-        "https://mcp-google-oauth.<your-subdomain>.workers.dev/sse"
-      ]
+
+Create `src/tools/index.ts`:
+
+```typescript
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { Props } from '../utils.js'
+import { registerFlightTools } from './flight'
+import { registerHotelTools } from './hotel'
+import { registerCalendarTools } from './calendar'
+import { registerTravelPlanTools } from './travel-plan'
+
+
+export function registerAllTools(
+  server: McpServer, 
+  props: Props
+) {
+  // Register individual tool categories
+  registerFlightTools(server, props)
+  registerHotelTools(server, props)
+  registerCalendarTools(server, props)
+  registerTravelPlanTools(server, props)
+}
+```
+
+### Step 6: Create Flight Tools
+
+Create `src/tools/flight.ts`:
+
+```typescript
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { z } from 'zod'
+import { FlightService } from '../services/flight-service'
+import { BookingService } from '../services/booking-service'
+import { Props } from '../utils'
+import { env } from 'cloudflare:workers'
+
+
+/**
+ * Registers flight-related tools with the MCP server
+ */
+export function registerFlightTools(server: McpServer, props: Props) {
+  const flightService = new FlightService(env.AVIATIONSTACK_API_KEY)
+  const bookingService = new BookingService(props.accessToken)
+
+  // Flight search tool
+  server.tool(
+    'search_flights',
+    'Search for flights between airports with dates, passengers, and class preferences',
+    {
+      origin: z.string().describe('Origin airport code (e.g., JFK, LAX)'),
+      destination: z.string().describe('Destination airport code (e.g., LHR, CDG)'),
+      departureDate: z.string().describe('Departure date in YYYY-MM-DD format'),
+      returnDate: z.string().optional().describe('Return date in YYYY-MM-DD format (optional)'),
+      passengers: z.number().default(1).describe('Number of passengers'),
+      flightClass: z.enum(['economy', 'business', 'first']).default('economy').describe('Flight class'),
+    },
+    async ({ origin, destination, departureDate, returnDate, passengers, flightClass }) => {
+      try {
+        const flights = await flightService.searchFlights({
+          origin,
+          destination,
+          departureDate,
+          returnDate,
+          passengers,
+          class: flightClass,
+        })
+
+        const flightSummary = flights
+          .map(
+            (flight) =>
+              `${flight.airline} ${flight.flightNumber}: ${flight.origin} → ${flight.destination}\n` +
+              `Departure: ${new Date(flight.departureTime).toLocaleString()}\n` +
+              `Arrival: ${new Date(flight.arrivalTime).toLocaleString()}\n` +
+              `Duration: ${flight.duration}\n` +
+              `Price: ${flight.currency} ${flight.price}\n` +
+              `Stops: ${flight.stops}\n`,
+          )
+          .join('\n---\n')
+
+        return {
+          content: [
+            {
+              text: `Found ${flights.length} flights from ${origin} to ${destination}:\n\n${flightSummary}`,
+              type: 'text',
+            },
+          ],
+        }
+      } catch (error) {
+        return {
+          content: [
+            {
+              text: `Error searching flights: ${error instanceof Error ? error.message : 'Unknown error'}`,
+              type: 'text',
+            },
+          ],
+        }
+      }
+    },
+  )
+
+  // Flight booking tool
+  server.tool(
+    'book_flight',
+    'Book a flight with passenger information and contact details',
+    {
+      flightId: z.string().describe('Flight ID from search results'),
+      passengers: z.array(z.object({
+        firstName: z.string().describe('Passenger first name'),
+        lastName: z.string().describe('Passenger last name'),
+        dateOfBirth: z.string().describe('Date of birth in YYYY-MM-DD format'),
+        passportNumber: z.string().optional().describe('Passport number (optional)'),
+        nationality: z.string().optional().describe('Nationality (optional)')
+      })).describe('List of passengers'),
+      contactInfo: z.object({
+        email: z.string().describe('Contact email'),
+        phone: z.string().describe('Contact phone number'),
+        firstName: z.string().describe('Contact first name'),
+        lastName: z.string().describe('Contact last name')
+      }).describe('Contact information')
+    },
+    async ({ flightId, passengers, contactInfo }) => {
+      try {
+        const bookingRequest = {
+          flightId,
+          passengers,
+          contactInfo
+        };
+
+        const confirmation = await bookingService.bookFlight(bookingRequest);
+
+        // Add booking to calendar
+        await bookingService.addToCalendar(confirmation);
+
+        return {
+          content: [
+            {
+              text: `✅ Flight booked successfully!\n\n` +
+                   `Booking ID: ${confirmation.bookingId}\n` +
+                   `Confirmation Number: ${confirmation.confirmationNumber}\n` +
+                   `Status: ${confirmation.status}\n` +
+                   `Total Price: ${confirmation.currency} ${confirmation.totalPrice}\n` +
+                   `Booking Date: ${new Date(confirmation.bookingDate).toLocaleString()}\n\n` +
+                   `📧 Confirmation email will be sent to ${contactInfo.email}\n` +
+                   `📅 Flight details have been added to your calendar`,
+              type: 'text',
+            },
+          ],
+        }
+      } catch (error) {
+        return {
+          content: [
+            {
+              text: `❌ Flight booking failed: ${error instanceof Error ? error.message : 'Unknown error'}\n\n` +
+                   `Please check your information and try again.`,
+              type: 'text',
+            },
+          ],
+        }
+      }
+    },
+  )
+}
+```
+
+### Step 7: Create Hotel Tools
+
+Create `src/tools/hotel.ts`:
+
+```typescript
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { z } from 'zod'
+import { HotelService } from '../services/hotel-service'
+import { BookingService } from '../services/booking-service'
+import { Props } from '../utils'
+import { env } from 'cloudflare:workers'
+
+/**
+ * Registers hotel-related tools with the MCP server
+ */
+export function registerHotelTools(server: McpServer, props: Props) {
+  const hotelService = new HotelService(env.RAPIDAPI_KEY)
+  const bookingService = new BookingService(props.accessToken)
+
+  // Hotel search tool
+  server.tool(
+    'search_hotels',
+    'Search for hotels by destination, dates, guests, and rating/price filters',
+    {
+      destination: z.string().describe('Destination city or location'),
+      checkIn: z.string().describe('Check-in date in YYYY-MM-DD format'),
+      checkOut: z.string().describe('Check-out date in YYYY-MM-DD format'),
+      guests: z.number().default(1).describe('Number of guests'),
+      rooms: z.number().default(1).describe('Number of rooms'),
+      minRating: z.number().optional().describe('Minimum hotel rating (1-5)'),
+      maxPrice: z.number().optional().describe('Maximum price per night'),
+    },
+    async ({ destination, checkIn, checkOut, guests, rooms, minRating, maxPrice }) => {
+      try {
+        const hotels = await hotelService.searchHotels({
+          destination,
+          checkIn,
+          checkOut,
+          guests,
+          rooms,
+          minRating,
+          maxPrice,
+        })
+
+        const hotelSummary = hotels
+          .map(
+            (hotel) =>
+              `${hotel.name} (${hotel.rating}⭐)\n` +
+              `Location: ${hotel.address}, ${hotel.city}\n` +
+              `Price: ${hotel.currency} ${hotel.pricePerNight}/night (Total: ${hotel.currency} ${hotel.totalPrice})\n` +
+              `Amenities: ${hotel.amenities.slice(0, 5).join(', ')}\n`,
+          )
+          .join('\n---\n')
+
+        return {
+          content: [
+            {
+              text: `Found ${hotels.length} hotels in ${destination}:\n\n${hotelSummary}`,
+              type: 'text',
+            },
+          ],
+        }
+      } catch (error) {
+        return {
+          content: [
+            {
+              text: `Error searching hotels: ${error instanceof Error ? error.message : 'Unknown error'}`,
+              type: 'text',
+            },
+          ],
+        }
+      }
+    },
+  )
+
+  // Hotel booking tool
+  server.tool(
+    'book_hotel',
+    'Book a hotel with guest information and contact details',
+    {
+      hotelId: z.string().describe('Hotel ID from search results'),
+      checkIn: z.string().describe('Check-in date in YYYY-MM-DD format'),
+      checkOut: z.string().describe('Check-out date in YYYY-MM-DD format'),
+      rooms: z.number().describe('Number of rooms'),
+      guests: z.number().describe('Number of guests'),
+      guestInfo: z
+        .array(
+          z.object({
+            firstName: z.string().describe('Guest first name'),
+            lastName: z.string().describe('Guest last name'),
+            email: z.string().optional().describe('Guest email (optional)'),
+          }),
+        )
+        .describe('List of guests'),
+      contactInfo: z
+        .object({
+          email: z.string().describe('Contact email'),
+          phone: z.string().describe('Contact phone number'),
+          firstName: z.string().describe('Contact first name'),
+          lastName: z.string().describe('Contact last name'),
+        })
+        .describe('Contact information'),
+    },
+    async ({ hotelId, checkIn, checkOut, rooms, guests, guestInfo, contactInfo }) => {
+      try {
+        const bookingRequest = {
+          hotelId,
+          checkIn,
+          checkOut,
+          rooms,
+          guests,
+          guestInfo,
+          contactInfo,
+        }
+
+        const confirmation = await bookingService.bookHotel(bookingRequest)
+
+        // Add booking to calendar
+        await bookingService.addToCalendar(confirmation)
+
+        const nights = Math.ceil((new Date(checkOut).getTime() - new Date(checkIn).getTime()) / (1000 * 60 * 60 * 24))
+
+        return {
+          content: [
+            {
+              text:
+                `✅ Hotel booked successfully!\n\n` +
+                `Booking ID: ${confirmation.bookingId}\n` +
+                `Confirmation Number: ${confirmation.confirmationNumber}\n` +
+                `Status: ${confirmation.status}\n` +
+                `Check-in: ${checkIn}\n` +
+                `Check-out: ${checkOut}\n` +
+                `Duration: ${nights} nights\n` +
+                `Rooms: ${rooms}\n` +
+                `Guests: ${guests}\n` +
+                `Total Price: ${confirmation.currency} ${confirmation.totalPrice}\n` +
+                `Booking Date: ${new Date(confirmation.bookingDate).toLocaleString()}\n\n` +
+                `📧 Confirmation email will be sent to ${contactInfo.email}\n` +
+                `📅 Hotel stay has been added to your calendar`,
+              type: 'text',
+            },
+          ],
+        }
+      } catch (error) {
+        return {
+          content: [
+            {
+              text:
+                `❌ Hotel booking failed: ${error instanceof Error ? error.message : 'Unknown error'}\n\n` +
+                `Please check your information and try again.`,
+              type: 'text',
+            },
+          ],
+        }
+      }
+    },
+  )
+}
+```
+
+### Step 8: Create Calendar Tools
+
+Create `src/tools/calendar.ts`:
+
+```typescript
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { z } from 'zod'
+import { CalendarService } from '../services/calendar-service'
+import { Props } from '../utils.js'
+
+export function registerCalendarTools(server: McpServer, props: Props) {
+  const calendarService = new CalendarService(props.accessToken)
+
+  // Calendar conflict check tool
+  server.tool(
+    'check_calendar_conflicts',
+    'Check your Google Calendar for conflicts with travel dates',
+    {
+      startDate: z.string().describe('Travel start date in YYYY-MM-DD format'),
+      endDate: z.string().describe('Travel end date in YYYY-MM-DD format'),
+    },
+    async ({ startDate, endDate }) => {
+      try {
+        // Get calendar events with buffer
+        const bufferStart = new Date(startDate)
+        bufferStart.setDate(bufferStart.getDate() - 1)
+
+        const bufferEnd = new Date(endDate)
+        bufferEnd.setDate(bufferEnd.getDate() + 1)
+
+        const events = await calendarService.getEvents(bufferStart.toISOString(), bufferEnd.toISOString())
+
+        const conflicts = calendarService.checkConflicts(events, startDate, endDate)
+
+        if (conflicts.length === 0) {
+          return {
+            content: [
+              {
+                text: `No calendar conflicts found for travel dates ${startDate} to ${endDate}. You're all clear to travel!`,
+                type: 'text',
+              },
+            ],
+          }
+        }
+
+        const conflictSummary = conflicts
+          .map(
+            (conflict) =>
+              `⚠️ ${conflict.severity.toUpperCase()}: ${conflict.eventTitle}\n` +
+              `Type: ${conflict.type}\n` +
+              `Time: ${new Date(conflict.conflictTime).toLocaleString()}\n` +
+              `Suggestion: ${conflict.suggestion}\n`,
+          )
+          .join('\n---\n')
+
+        return {
+          content: [
+            {
+              text: `Found ${conflicts.length} potential conflicts for travel dates ${startDate} to ${endDate}:\n\n${conflictSummary}`,
+              type: 'text',
+            },
+          ],
+        }
+      } catch (error) {
+        return {
+          content: [
+            {
+              text: `Error checking calendar conflicts: ${error instanceof Error ? error.message : 'Unknown error'}`,
+              type: 'text',
+            },
+          ],
+        }
+      }
+    },
+  )
+}
+```
+
+### Step 9: Create Travel Plan Tools
+
+Create `src/tools/travel-plan.ts`:
+
+```typescript
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { z } from 'zod'
+import { BookingService } from '../services/booking-service'
+import { Props } from '../utils'
+
+/**
+ * Registers travel plan management tools with the MCP server
+ */
+export function registerTravelPlanTools(server: McpServer, props: Props) {
+  const bookingService = new BookingService(props.accessToken)
+
+  // Create travel plan tool
+  server.tool(
+    'create_travel_plan',
+    'Create a new travel plan with destinations, dates, travelers, and budget',
+    {
+      title: z.string().describe('Title for the travel plan'),
+      destinations: z.array(z.string()).describe('List of destinations'),
+      startDate: z.string().describe('Travel start date in YYYY-MM-DD format'),
+      endDate: z.string().describe('Travel end date in YYYY-MM-DD format'),
+      travelers: z.number().default(1).describe('Number of travelers'),
+      budget: z.number().optional().describe('Budget for the trip')
+    },
+    async ({ title, destinations, startDate, endDate, travelers, budget }) => {
+      try {
+        const plan = await bookingService.createTravelPlan(
+          title,
+          destinations,
+          startDate,
+          endDate,
+          travelers,
+          budget
+        );
+
+        return {
+          content: [
+            {
+              text: `✅ Travel plan created successfully!\n\n` +
+                   `Plan ID: ${plan.id}\n` +
+                   `Title: ${plan.title}\n` +
+                   `Destinations: ${plan.destinations.join(', ')}\n` +
+                   `Dates: ${plan.startDate} to ${plan.endDate}\n` +
+                   `Travelers: ${plan.travelers}\n` +
+                   `Budget: ${plan.budget ? `$${plan.budget}` : 'Not set'}\n` +
+                   `Status: ${plan.status}\n\n` +
+                   `🎯 Use this Plan ID (${plan.id}) to search for flights and hotels, then book your complete trip!`,
+              type: 'text',
+            },
+          ],
+        }
+      } catch (error) {
+        return {
+          content: [
+            {
+              text: `❌ Failed to create travel plan: ${error instanceof Error ? error.message : 'Unknown error'}`,
+              type: 'text',
+            },
+          ],
+        }
+      }
+    },
+  )
+
+  // Get travel plan tool
+  server.tool(
+    'get_travel_plan',
+    'Retrieve details of an existing travel plan',
+    {
+      planId: z.string().describe('Travel plan ID')
+    },
+    async ({ planId }) => {
+      try {
+        const plan = await bookingService.getTravelPlan(planId);
+
+        if (!plan) {
+          return {
+            content: [
+              {
+                text: `❌ Travel plan not found with ID: ${planId}`,
+                type: 'text',
+              },
+            ],
+          }
+        }
+
+        const flightSummary = plan.flights && plan.flights.length > 0 
+          ? `\n\n✈️ Flights (${plan.flights.length}):\n` + 
+            plan.flights.map(f => `- ${f.confirmationNumber} (${f.status})`).join('\n')
+          : '\n\n✈️ No flights booked yet';
+
+        const hotelSummary = plan.hotels && plan.hotels.length > 0
+          ? `\n\n🏨 Hotels (${plan.hotels.length}):\n` + 
+            plan.hotels.map(h => `- ${h.confirmationNumber} (${h.status})`).join('\n')
+          : '\n\n🏨 No hotels booked yet';
+
+        return {
+          content: [
+            {
+              text: `📋 Travel Plan Details\n\n` +
+                   `Plan ID: ${plan.id}\n` +
+                   `Title: ${plan.title}\n` +
+                   `Destinations: ${plan.destinations.join(', ')}\n` +
+                   `Dates: ${plan.startDate} to ${plan.endDate}\n` +
+                   `Travelers: ${plan.travelers}\n` +
+                   `Budget: ${plan.budget ? `$${plan.budget}` : 'Not set'}\n` +
+                   `Status: ${plan.status}\n` +
+                   `Created: ${new Date(plan.createdAt).toLocaleString()}\n` +
+                   `Updated: ${new Date(plan.updatedAt).toLocaleString()}` +
+                   flightSummary + hotelSummary,
+              type: 'text',
+            },
+          ],
+        }
+      } catch (error) {
+        return {
+          content: [
+            {
+              text: `❌ Failed to retrieve travel plan: ${error instanceof Error ? error.message : 'Unknown error'}`,
+              type: 'text',
+            },
+          ],
+        }
+      }
+    },
+  )
+
+  // Book complete trip tool
+  server.tool(
+    'book_trip',
+    'Book a complete trip with flights and hotels for a travel plan',
+    {
+      planId: z.string().describe('Travel plan ID'),
+      flightBookings: z.array(z.object({
+        flightId: z.string().describe('Flight ID from search results'),
+        passengers: z.array(z.object({
+          firstName: z.string().describe('Passenger first name'),
+          lastName: z.string().describe('Passenger last name'),
+          dateOfBirth: z.string().describe('Date of birth in YYYY-MM-DD format'),
+          passportNumber: z.string().optional().describe('Passport number (optional)'),
+          nationality: z.string().optional().describe('Nationality (optional)')
+        })).describe('List of passengers')
+      })).describe('Flight bookings to make'),
+      hotelBookings: z.array(z.object({
+        hotelId: z.string().describe('Hotel ID from search results'),
+        checkIn: z.string().describe('Check-in date in YYYY-MM-DD format'),
+        checkOut: z.string().describe('Check-out date in YYYY-MM-DD format'),
+        rooms: z.number().describe('Number of rooms'),
+        guests: z.number().describe('Number of guests'),
+        guestInfo: z.array(z.object({
+          firstName: z.string().describe('Guest first name'),
+          lastName: z.string().describe('Guest last name'),
+          email: z.string().optional().describe('Guest email (optional)')
+        })).describe('List of guests')
+      })).describe('Hotel bookings to make'),
+      contactInfo: z.object({
+        email: z.string().describe('Contact email'),
+        phone: z.string().describe('Contact phone number'),
+        firstName: z.string().describe('Contact first name'),
+        lastName: z.string().describe('Contact last name')
+      }).describe('Contact information for all bookings')
+    },
+    async ({ planId, flightBookings, hotelBookings, contactInfo }) => {
+      try {
+        // Convert to booking service format
+        const flightRequests = flightBookings.map(fb => ({
+          flightId: fb.flightId,
+          passengers: fb.passengers,
+          contactInfo
+        }));
+
+        const hotelRequests = hotelBookings.map(hb => ({
+          hotelId: hb.hotelId,
+          checkIn: hb.checkIn,
+          checkOut: hb.checkOut,
+          rooms: hb.rooms,
+          guests: hb.guests,
+          guestInfo: hb.guestInfo,
+          contactInfo
+        }));
+
+        const result = await bookingService.bookTrip(planId, flightRequests, hotelRequests);
+
+        const flightSummary = result.flightConfirmations.length > 0
+          ? `\n\n✈️ Flights Booked (${result.flightConfirmations.length}):\n` +
+            result.flightConfirmations.map(f => 
+              `- ${f.confirmationNumber} (${f.status}) - ${f.currency} ${f.totalPrice}`
+            ).join('\n')
+          : '';
+
+        const hotelSummary = result.hotelConfirmations.length > 0
+          ? `\n\n🏨 Hotels Booked (${result.hotelConfirmations.length}):\n` +
+            result.hotelConfirmations.map(h => 
+              `- ${h.confirmationNumber} (${h.status}) - ${h.currency} ${h.totalPrice}`
+            ).join('\n')
+          : '';
+
+        return {
+          content: [
+            {
+              text: `🎉 Trip booked successfully!\n\n` +
+                   `Travel Plan: ${result.plan.title}\n` +
+                   `Plan ID: ${result.plan.id}\n` +
+                   `Status: ${result.plan.status}\n` +
+                   `Total Cost: $${result.totalCost}\n` +
+                   `Booking Date: ${new Date().toLocaleString()}` +
+                   flightSummary + hotelSummary +
+                   `\n\n📧 Confirmation emails will be sent to ${contactInfo.email}\n` +
+                   `📅 All bookings have been added to your calendar\n` +
+                   `🎯 Your complete trip is now confirmed!`,
+              type: 'text',
+            },
+          ],
+        }
+      } catch (error) {
+        return {
+          content: [
+            {
+              text: `❌ Trip booking failed: ${error instanceof Error ? error.message : 'Unknown error'}\n\n` +
+                   `Some bookings may have been partially completed. Please check individual confirmations.`,
+              type: 'text',
+            },
+          ],
+        }
+      }
+    },
+  )
+}
+```
+
+### Step 10: Create Service Layer
+
+Create the service directory and implement the service classes:
+
+```bash
+mkdir -p src/services
+```
+
+#### Create `src/services/flight-service.ts`:
+
+```typescript
+import { FlightSearchParams, FlightInfo, AviationstackResponse } from '../types/index.js';
+
+export class FlightService {
+  private apiKey: string;
+  private baseUrl = 'http://api.aviationstack.com/v1';
+
+  constructor(apiKey: string) {
+    this.apiKey = apiKey;
+  }
+
+  async searchFlights(params: FlightSearchParams): Promise<FlightInfo[]> {
+    try {
+      // Search for flights using Aviationstack API
+      const url = new URL(`${this.baseUrl}/flights`);
+      url.searchParams.set('access_key', this.apiKey);
+      url.searchParams.set('dep_iata', params.origin);
+      url.searchParams.set('arr_iata', params.destination);
+      url.searchParams.set('flight_date', params.departureDate);
+      url.searchParams.set('limit', '50');
+
+      const response = await fetch(url.toString());
+      
+      if (!response.ok) {
+        throw new Error(`Flight API error: ${response.status} ${response.statusText}`);
+      }
+
+      const data: AviationstackResponse = await response.json();
+      
+      return this.transformFlightData(data.data, params);
+    } catch (error) {
+      console.error('Error searching flights:', error);
+      // Return mock data for development
+      return this.getMockFlights(params);
+    }
+  }
+
+  private transformFlightData(flights: AviationstackResponse['data'], params: FlightSearchParams): FlightInfo[] {
+    return flights.map((flight, index) => ({
+      id: `flight_${index}_${Date.now()}`,
+      airline: flight.airline.name,
+      flightNumber: flight.flight.iata,
+      origin: flight.departure.iata,
+      destination: flight.arrival.iata,
+      departureTime: flight.departure.scheduled,
+      arrivalTime: flight.arrival.scheduled,
+      duration: this.calculateDuration(flight.departure.scheduled, flight.arrival.scheduled),
+      price: this.estimatePrice(params.origin, params.destination, params.class || 'economy'),
+      currency: 'USD',
+      aircraft: flight.aircraft.iata,
+      stops: 0, // Aviationstack doesn't provide stops info directly
+      bookingUrl: `https://www.kayak.com/flights/${params.origin}-${params.destination}/${params.departureDate}`
+    }));
+  }
+
+  private calculateDuration(departure: string, arrival: string): string {
+    const dep = new Date(departure);
+    const arr = new Date(arrival);
+    const diffMs = arr.getTime() - dep.getTime();
+    const hours = Math.floor(diffMs / (1000 * 60 * 60));
+    const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    return `${hours}h ${minutes}m`;
+  }
+
+  private estimatePrice(origin: string, destination: string, flightClass: string): number {
+    // Simple price estimation based on distance and class
+    const basePrice = 200;
+    const classMultiplier = flightClass === 'business' ? 3 : flightClass === 'first' ? 5 : 1;
+    const randomFactor = 0.8 + Math.random() * 0.4; // 80% to 120% of base
+    return Math.round(basePrice * classMultiplier * randomFactor);
+  }
+
+  private getMockFlights(params: FlightSearchParams): FlightInfo[] {
+    return [
+      {
+        id: `mock_flight_1_${Date.now()}`,
+        airline: 'American Airlines',
+        flightNumber: 'AA1234',
+        origin: params.origin,
+        destination: params.destination,
+        departureTime: `${params.departureDate}T08:00:00Z`,
+        arrivalTime: `${params.departureDate}T12:30:00Z`,
+        duration: '4h 30m',
+        price: 450,
+        currency: 'USD',
+        aircraft: 'Boeing 737',
+        stops: 0,
+        bookingUrl: `https://www.kayak.com/flights/${params.origin}-${params.destination}/${params.departureDate}`
+      },
+      {
+        id: `mock_flight_2_${Date.now()}`,
+        airline: 'Delta Air Lines',
+        flightNumber: 'DL5678',
+        origin: params.origin,
+        destination: params.destination,
+        departureTime: `${params.departureDate}T14:15:00Z`,
+        arrivalTime: `${params.departureDate}T18:45:00Z`,
+        duration: '4h 30m',
+        price: 520,
+        currency: 'USD',
+        aircraft: 'Airbus A320',
+        stops: 0,
+        bookingUrl: `https://www.kayak.com/flights/${params.origin}-${params.destination}/${params.departureDate}`
+      }
+    ];
+  }
+
+  async getFlightStatus(flightNumber: string, date: string): Promise<any> {
+    try {
+      const url = new URL(`${this.baseUrl}/flights`);
+      url.searchParams.set('access_key', this.apiKey);
+      url.searchParams.set('flight_iata', flightNumber);
+      url.searchParams.set('flight_date', date);
+
+      const response = await fetch(url.toString());
+      
+      if (!response.ok) {
+        throw new Error(`Flight status API error: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error getting flight status:', error);
+      return { status: 'unknown', message: 'Unable to fetch flight status' };
     }
   }
 }
 ```
 
-Once the Tools (under 🔨) show up in the interface, you can ask Claude to use them. For example: "Could you use the math tool to add 23 and 19?". Claude should invoke the tool and show the result generated by the MCP server.
+### Step 11: Create Hotel Service
 
-### For Local Development
-If you'd like to iterate and test your MCP server, you can do so in local development. This will require you to create another OAuth App on Google Cloud: 
-- For the Homepage URL, specify `http://localhost:8788`
-- For the Authorization callback URL, specify `http://localhost:8788/callback`
-- Note your Client ID and generate a Client secret. 
-- Create a `.dev.vars` file in your project root with: 
+Create `src/services/hotel-service.ts`:
+
+```typescript
+import { FlightSearchParams, FlightInfo, AviationstackResponse } from '../types/index.js';
+
+export class FlightService {
+  private apiKey: string;
+  private baseUrl = 'http://api.aviationstack.com/v1';
+
+  constructor(apiKey: string) {
+    this.apiKey = apiKey;
+  }
+
+  async searchFlights(params: FlightSearchParams): Promise<FlightInfo[]> {
+    try {
+      // Search for flights using Aviationstack API
+      const url = new URL(`${this.baseUrl}/flights`);
+      url.searchParams.set('access_key', this.apiKey);
+      url.searchParams.set('dep_iata', params.origin);
+      url.searchParams.set('arr_iata', params.destination);
+      url.searchParams.set('flight_date', params.departureDate);
+      url.searchParams.set('limit', '50');
+
+      const response = await fetch(url.toString());
+      
+      if (!response.ok) {
+        throw new Error(`Flight API error: ${response.status} ${response.statusText}`);
+      }
+
+      const data: AviationstackResponse = await response.json();
+      
+      return this.transformFlightData(data.data, params);
+    } catch (error) {
+      console.error('Error searching flights:', error);
+      // Return mock data for development
+      return this.getMockFlights(params);
+    }
+  }
+
+  private transformFlightData(flights: AviationstackResponse['data'], params: FlightSearchParams): FlightInfo[] {
+    return flights.map((flight, index) => ({
+      id: `flight_${index}_${Date.now()}`,
+      airline: flight.airline.name,
+      flightNumber: flight.flight.iata,
+      origin: flight.departure.iata,
+      destination: flight.arrival.iata,
+      departureTime: flight.departure.scheduled,
+      arrivalTime: flight.arrival.scheduled,
+      duration: this.calculateDuration(flight.departure.scheduled, flight.arrival.scheduled),
+      price: this.estimatePrice(params.origin, params.destination, params.class || 'economy'),
+      currency: 'USD',
+      aircraft: flight.aircraft.iata,
+      stops: 0, // Aviationstack doesn't provide stops info directly
+      bookingUrl: `https://www.kayak.com/flights/${params.origin}-${params.destination}/${params.departureDate}`
+    }));
+  }
+
+  private calculateDuration(departure: string, arrival: string): string {
+    const dep = new Date(departure);
+    const arr = new Date(arrival);
+    const diffMs = arr.getTime() - dep.getTime();
+    const hours = Math.floor(diffMs / (1000 * 60 * 60));
+    const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    return `${hours}h ${minutes}m`;
+  }
+
+  private estimatePrice(origin: string, destination: string, flightClass: string): number {
+    // Simple price estimation based on distance and class
+    const basePrice = 200;
+    const classMultiplier = flightClass === 'business' ? 3 : flightClass === 'first' ? 5 : 1;
+    const randomFactor = 0.8 + Math.random() * 0.4; // 80% to 120% of base
+    return Math.round(basePrice * classMultiplier * randomFactor);
+  }
+
+  private getMockFlights(params: FlightSearchParams): FlightInfo[] {
+    return [
+      {
+        id: `mock_flight_1_${Date.now()}`,
+        airline: 'American Airlines',
+        flightNumber: 'AA1234',
+        origin: params.origin,
+        destination: params.destination,
+        departureTime: `${params.departureDate}T08:00:00Z`,
+        arrivalTime: `${params.departureDate}T12:30:00Z`,
+        duration: '4h 30m',
+        price: 450,
+        currency: 'USD',
+        aircraft: 'Boeing 737',
+        stops: 0,
+        bookingUrl: `https://www.kayak.com/flights/${params.origin}-${params.destination}/${params.departureDate}`
+      },
+      {
+        id: `mock_flight_2_${Date.now()}`,
+        airline: 'Delta Air Lines',
+        flightNumber: 'DL5678',
+        origin: params.origin,
+        destination: params.destination,
+        departureTime: `${params.departureDate}T14:15:00Z`,
+        arrivalTime: `${params.departureDate}T18:45:00Z`,
+        duration: '4h 30m',
+        price: 520,
+        currency: 'USD',
+        aircraft: 'Airbus A320',
+        stops: 0,
+        bookingUrl: `https://www.kayak.com/flights/${params.origin}-${params.destination}/${params.departureDate}`
+      }
+    ];
+  }
+
+  async getFlightStatus(flightNumber: string, date: string): Promise<any> {
+    try {
+      const url = new URL(`${this.baseUrl}/flights`);
+      url.searchParams.set('access_key', this.apiKey);
+      url.searchParams.set('flight_iata', flightNumber);
+      url.searchParams.set('flight_date', date);
+
+      const response = await fetch(url.toString());
+      
+      if (!response.ok) {
+        throw new Error(`Flight status API error: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error getting flight status:', error);
+      return { status: 'unknown', message: 'Unable to fetch flight status' };
+    }
+  }
+}
 ```
-GOOGLE_CLIENT_ID=your_development_google_cloud_oauth_client_id
-GOOGLE_CLIENT_SECRET=your_development_google_cloud_oauth_client_secret
+
+## Calender Service
+
+```typescript
+ import { CalendarEvent, Conflict } from '../types/index.js';
+
+export class CalendarService {
+  private accessToken: string;
+  private baseUrl = 'https://www.googleapis.com/calendar/v3';
+
+  constructor(accessToken: string) {
+    this.accessToken = accessToken;
+  }
+
+  async getEvents(startDate: string, endDate: string): Promise<CalendarEvent[]> {
+    try {
+      const url = new URL(`${this.baseUrl}/calendars/primary/events`);
+      url.searchParams.set('timeMin', new Date(startDate).toISOString());
+      url.searchParams.set('timeMax', new Date(endDate).toISOString());
+      url.searchParams.set('singleEvents', 'true');
+      url.searchParams.set('orderBy', 'startTime');
+
+      const response = await fetch(url.toString(), {
+        headers: {
+          'Authorization': `Bearer ${this.accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Calendar API error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json() as { items?: any[] };
+      return this.transformCalendarEvents(data.items || []);
+    } catch (error) {
+      console.error('Error fetching calendar events:', error);
+      // Return mock data for development
+      return this.getMockEvents(startDate, endDate);
+    }
+  }
+
+  private transformCalendarEvents(events: any[]): CalendarEvent[] {
+    return events.map(event => ({
+      id: event.id,
+      summary: event.summary || 'No title',
+      description: event.description,
+      start: {
+        dateTime: event.start.dateTime,
+        date: event.start.date,
+        timeZone: event.start.timeZone
+      },
+      end: {
+        dateTime: event.end.dateTime,
+        date: event.end.date,
+        timeZone: event.end.timeZone
+      },
+      location: event.location
+    }));
+  }
+
+  private getMockEvents(startDate: string, endDate: string): CalendarEvent[] {
+    const start = new Date(startDate);
+    const mockEvents: CalendarEvent[] = [];
+
+    // Add some mock events for testing
+    const event1Date = new Date(start);
+    event1Date.setDate(start.getDate() + 1);
+    
+    mockEvents.push({
+      id: 'mock_event_1',
+      summary: 'Team Meeting',
+      description: 'Weekly team sync meeting',
+      start: {
+        dateTime: event1Date.toISOString().replace(/\.\d{3}Z$/, 'Z'),
+        timeZone: 'America/New_York'
+      },
+      end: {
+        dateTime: new Date(event1Date.getTime() + 60 * 60 * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z'),
+        timeZone: 'America/New_York'
+      },
+      location: 'Conference Room A'
+    });
+
+    const event2Date = new Date(start);
+    event2Date.setDate(start.getDate() + 2);
+    event2Date.setHours(14, 0, 0, 0);
+
+    mockEvents.push({
+      id: 'mock_event_2',
+      summary: 'Client Presentation',
+      description: 'Quarterly business review with client',
+      start: {
+        dateTime: event2Date.toISOString().replace(/\.\d{3}Z$/, 'Z'),
+        timeZone: 'America/New_York'
+      },
+      end: {
+        dateTime: new Date(event2Date.getTime() + 2 * 60 * 60 * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z'),
+        timeZone: 'America/New_York'
+      },
+      location: 'Client Office'
+    });
+
+    return mockEvents;
+  }
+
+  async createEvent(event: Partial<CalendarEvent>): Promise<CalendarEvent | null> {
+    try {
+      const response = await fetch(`${this.baseUrl}/calendars/primary/events`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          summary: event.summary,
+          description: event.description,
+          start: event.start,
+          end: event.end,
+          location: event.location
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Calendar create event error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return this.transformCalendarEvents([data])[0];
+    } catch (error) {
+      console.error('Error creating calendar event:', error);
+      return null;
+    }
+  }
+
+  checkConflicts(events: CalendarEvent[], travelStartDate: string, travelEndDate: string): Conflict[] {
+    const conflicts: Conflict[] = [];
+    const travelStart = new Date(travelStartDate);
+    const travelEnd = new Date(travelEndDate);
+
+    // Add buffer time for travel (4 hours before departure, 2 hours after return)
+    const departureBuffer = new Date(travelStart.getTime() - 4 * 60 * 60 * 1000);
+    const returnBuffer = new Date(travelEnd.getTime() + 2 * 60 * 60 * 1000);
+
+    for (const event of events) {
+      const eventStart = new Date(event.start.dateTime || event.start.date || '');
+      const eventEnd = new Date(event.end.dateTime || event.end.date || '');
+
+      // Check for overlaps with travel period
+      if (this.isOverlapping(eventStart, eventEnd, travelStart, travelEnd)) {
+        conflicts.push({
+          type: 'overlap',
+          eventId: event.id,
+          eventTitle: event.summary,
+          conflictTime: eventStart.toISOString(),
+          severity: 'high',
+          suggestion: 'Consider rescheduling this event or adjusting travel dates'
+        });
+      }
+
+      // Check for tight schedule conflicts (events too close to travel time)
+      if (this.isTooClose(eventStart, eventEnd, departureBuffer, travelStart)) {
+        conflicts.push({
+          type: 'tight_schedule',
+          eventId: event.id,
+          eventTitle: event.summary,
+          conflictTime: eventStart.toISOString(),
+          severity: 'medium',
+          suggestion: 'Allow more time between this event and travel departure'
+        });
+      }
+
+      if (this.isTooClose(returnBuffer, travelEnd, eventStart, eventEnd)) {
+        conflicts.push({
+          type: 'tight_schedule',
+          eventId: event.id,
+          eventTitle: event.summary,
+          conflictTime: eventStart.toISOString(),
+          severity: 'medium',
+          suggestion: 'Allow more time between travel return and this event'
+        });
+      }
+
+      // Check for travel time conflicts (events in different locations)
+      if (event.location && this.requiresTravelTime(event.location, travelStart, travelEnd)) {
+        conflicts.push({
+          type: 'travel_time',
+          eventId: event.id,
+          eventTitle: event.summary,
+          conflictTime: eventStart.toISOString(),
+          severity: 'low',
+          suggestion: 'Consider travel time to/from this event location'
+        });
+      }
+    }
+
+    return conflicts;
+  }
+
+  private isOverlapping(start1: Date, end1: Date, start2: Date, end2: Date): boolean {
+    return start1 < end2 && start2 < end1;
+  }
+
+  private isTooClose(start1: Date, end1: Date, start2: Date, end2: Date): boolean {
+    const timeDiff = Math.abs(end1.getTime() - start2.getTime());
+    const oneHour = 60 * 60 * 1000;
+    return timeDiff < oneHour;
+  }
+
+  private requiresTravelTime(eventLocation: string, travelStart: Date, travelEnd: Date): boolean {
+    // Simple heuristic: if event location contains airport codes or is far from typical locations
+    const airportCodes = ['airport', 'terminal', 'gate'];
+    const location = eventLocation.toLowerCase();
+    return airportCodes.some(code => location.includes(code));
+  }
+
+  async deleteEvent(eventId: string): Promise<boolean> {
+    try {
+      const response = await fetch(`${this.baseUrl}/calendars/primary/events/${eventId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${this.accessToken}`
+        }
+      });
+
+      return response.ok;
+    } catch (error) {
+      console.error('Error deleting calendar event:', error);
+      return false;
+    }
+  }
+
+  async updateEvent(eventId: string, updates: Partial<CalendarEvent>): Promise<CalendarEvent | null> {
+    try {
+      const response = await fetch(`${this.baseUrl}/calendars/primary/events/${eventId}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${this.accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          summary: updates.summary,
+          description: updates.description,
+          start: updates.start,
+          end: updates.end,
+          location: updates.location
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Calendar update event error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return this.transformCalendarEvents([data])[0];
+    } catch (error) {
+      console.error('Error updating calendar event:', error);
+      return null;
+    }
+  }
+}
 ```
 
-#### Develop & Test
-Run the server locally to make it available at `http://localhost:8788`
-`wrangler dev`
+### Step : Booking service
 
-To test the local server, enter `http://localhost:8788/sse` into Inspector and hit connect. Once you follow the prompts, you'll be able to "List Tools". 
+```typescript
+import { CalendarEvent, Conflict } from '../types/index.js';
 
-#### Using Claude and other MCP Clients
+export class CalendarService {
+  private accessToken: string;
+  private baseUrl = 'https://www.googleapis.com/calendar/v3';
 
-When using Claude to connect to your remote MCP server, you may see some error messages. This is because Claude Desktop doesn't yet support remote MCP servers, so it sometimes gets confused. To verify whether the MCP server is connected, hover over the 🔨 icon in the bottom right corner of Claude's interface. You should see your tools available there.
+  constructor(accessToken: string) {
+    this.accessToken = accessToken;
+  }
 
-#### Using Cursor and other MCP Clients
+  async getEvents(startDate: string, endDate: string): Promise<CalendarEvent[]> {
+    try {
+      const url = new URL(`${this.baseUrl}/calendars/primary/events`);
+      url.searchParams.set('timeMin', new Date(startDate).toISOString());
+      url.searchParams.set('timeMax', new Date(endDate).toISOString());
+      url.searchParams.set('singleEvents', 'true');
+      url.searchParams.set('orderBy', 'startTime');
 
-To connect Cursor with your MCP server, choose `Type`: "Command" and in the `Command` field, combine the command and args fields into one (e.g. `npx mcp-remote https://<your-worker-name>.<your-subdomain>.workers.dev/sse`).
+      const response = await fetch(url.toString(), {
+        headers: {
+          'Authorization': `Bearer ${this.accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
 
-Note that while Cursor supports HTTP+SSE servers, it doesn't support authentication, so you still need to use `mcp-remote` (and to use a STDIO server, not an HTTP one).
+      if (!response.ok) {
+        throw new Error(`Calendar API error: ${response.status} ${response.statusText}`);
+      }
 
-You can connect your MCP server to other MCP clients like Windsurf by opening the client's configuration file, adding the same JSON that was used for the Claude setup, and restarting the MCP client.
+      const data = await response.json() as { items?: any[] };
+      return this.transformCalendarEvents(data.items || []);
+    } catch (error) {
+      console.error('Error fetching calendar events:', error);
+      // Return mock data for development
+      return this.getMockEvents(startDate, endDate);
+    }
+  }
 
-## How does it work? 
+  private transformCalendarEvents(events: any[]): CalendarEvent[] {
+    return events.map(event => ({
+      id: event.id,
+      summary: event.summary || 'No title',
+      description: event.description,
+      start: {
+        dateTime: event.start.dateTime,
+        date: event.start.date,
+        timeZone: event.start.timeZone
+      },
+      end: {
+        dateTime: event.end.dateTime,
+        date: event.end.date,
+        timeZone: event.end.timeZone
+      },
+      location: event.location
+    }));
+  }
 
-#### OAuth Provider
-The OAuth Provider library serves as a complete OAuth 2.1 server implementation for Cloudflare Workers. It handles the complexities of the OAuth flow, including token issuance, validation, and management. In this project, it plays the dual role of:
+  private getMockEvents(startDate: string, endDate: string): CalendarEvent[] {
+    const start = new Date(startDate);
+    const mockEvents: CalendarEvent[] = [];
 
-- Authenticating MCP clients that connect to your server
-- Managing the connection to Google Cloud's OAuth services
-- Securely storing tokens and authentication state in KV storage
+    // Add some mock events for testing
+    const event1Date = new Date(start);
+    event1Date.setDate(start.getDate() + 1);
+    
+    mockEvents.push({
+      id: 'mock_event_1',
+      summary: 'Team Meeting',
+      description: 'Weekly team sync meeting',
+      start: {
+        dateTime: event1Date.toISOString().replace(/\.\d{3}Z$/, 'Z'),
+        timeZone: 'America/New_York'
+      },
+      end: {
+        dateTime: new Date(event1Date.getTime() + 60 * 60 * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z'),
+        timeZone: 'America/New_York'
+      },
+      location: 'Conference Room A'
+    });
 
-#### Durable MCP
-Durable MCP extends the base MCP functionality with Cloudflare's Durable Objects, providing:
-- Persistent state management for your MCP server
-- Secure storage of authentication context between requests
-- Access to authenticated user information via `this.props`
-- Support for conditional tool availability based on user identity
+    const event2Date = new Date(start);
+    event2Date.setDate(start.getDate() + 2);
+    event2Date.setHours(14, 0, 0, 0);
 
-#### MCP Remote
-The MCP Remote library enables your server to expose tools that can be invoked by MCP clients like the Inspector. It:
-- Defines the protocol for communication between clients and your server
-- Provides a structured way to define tools
-- Handles serialization and deserialization of requests and responses
-- Maintains the Server-Sent Events (SSE) connection between clients and your server
+    mockEvents.push({
+      id: 'mock_event_2',
+      summary: 'Client Presentation',
+      description: 'Quarterly business review with client',
+      start: {
+        dateTime: event2Date.toISOString().replace(/\.\d{3}Z$/, 'Z'),
+        timeZone: 'America/New_York'
+      },
+      end: {
+        dateTime: new Date(event2Date.getTime() + 2 * 60 * 60 * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z'),
+        timeZone: 'America/New_York'
+      },
+      location: 'Client Office'
+    });
+
+    return mockEvents;
+  }
+
+  async createEvent(event: Partial<CalendarEvent>): Promise<CalendarEvent | null> {
+    try {
+      const response = await fetch(`${this.baseUrl}/calendars/primary/events`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          summary: event.summary,
+          description: event.description,
+          start: event.start,
+          end: event.end,
+          location: event.location
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Calendar create event error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return this.transformCalendarEvents([data])[0];
+    } catch (error) {
+      console.error('Error creating calendar event:', error);
+      return null;
+    }
+  }
+
+  checkConflicts(events: CalendarEvent[], travelStartDate: string, travelEndDate: string): Conflict[] {
+    const conflicts: Conflict[] = [];
+    const travelStart = new Date(travelStartDate);
+    const travelEnd = new Date(travelEndDate);
+
+    // Add buffer time for travel (4 hours before departure, 2 hours after return)
+    const departureBuffer = new Date(travelStart.getTime() - 4 * 60 * 60 * 1000);
+    const returnBuffer = new Date(travelEnd.getTime() + 2 * 60 * 60 * 1000);
+
+    for (const event of events) {
+      const eventStart = new Date(event.start.dateTime || event.start.date || '');
+      const eventEnd = new Date(event.end.dateTime || event.end.date || '');
+
+      // Check for overlaps with travel period
+      if (this.isOverlapping(eventStart, eventEnd, travelStart, travelEnd)) {
+        conflicts.push({
+          type: 'overlap',
+          eventId: event.id,
+          eventTitle: event.summary,
+          conflictTime: eventStart.toISOString(),
+          severity: 'high',
+          suggestion: 'Consider rescheduling this event or adjusting travel dates'
+        });
+      }
+
+      // Check for tight schedule conflicts (events too close to travel time)
+      if (this.isTooClose(eventStart, eventEnd, departureBuffer, travelStart)) {
+        conflicts.push({
+          type: 'tight_schedule',
+          eventId: event.id,
+          eventTitle: event.summary,
+          conflictTime: eventStart.toISOString(),
+          severity: 'medium',
+          suggestion: 'Allow more time between this event and travel departure'
+        });
+      }
+
+      if (this.isTooClose(returnBuffer, travelEnd, eventStart, eventEnd)) {
+        conflicts.push({
+          type: 'tight_schedule',
+          eventId: event.id,
+          eventTitle: event.summary,
+          conflictTime: eventStart.toISOString(),
+          severity: 'medium',
+          suggestion: 'Allow more time between travel return and this event'
+        });
+      }
+
+      // Check for travel time conflicts (events in different locations)
+      if (event.location && this.requiresTravelTime(event.location, travelStart, travelEnd)) {
+        conflicts.push({
+          type: 'travel_time',
+          eventId: event.id,
+          eventTitle: event.summary,
+          conflictTime: eventStart.toISOString(),
+          severity: 'low',
+          suggestion: 'Consider travel time to/from this event location'
+        });
+      }
+    }
+
+    return conflicts;
+  }
+
+  private isOverlapping(start1: Date, end1: Date, start2: Date, end2: Date): boolean {
+    return start1 < end2 && start2 < end1;
+  }
+
+  private isTooClose(start1: Date, end1: Date, start2: Date, end2: Date): boolean {
+    const timeDiff = Math.abs(end1.getTime() - start2.getTime());
+    const oneHour = 60 * 60 * 1000;
+    return timeDiff < oneHour;
+  }
+
+  private requiresTravelTime(eventLocation: string, travelStart: Date, travelEnd: Date): boolean {
+    // Simple heuristic: if event location contains airport codes or is far from typical locations
+    const airportCodes = ['airport', 'terminal', 'gate'];
+    const location = eventLocation.toLowerCase();
+    return airportCodes.some(code => location.includes(code));
+  }
+
+  async deleteEvent(eventId: string): Promise<boolean> {
+    try {
+      const response = await fetch(`${this.baseUrl}/calendars/primary/events/${eventId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${this.accessToken}`
+        }
+      });
+
+      return response.ok;
+    } catch (error) {
+      console.error('Error deleting calendar event:', error);
+      return false;
+    }
+  }
+
+  async updateEvent(eventId: string, updates: Partial<CalendarEvent>): Promise<CalendarEvent | null> {
+    try {
+      const response = await fetch(`${this.baseUrl}/calendars/primary/events/${eventId}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${this.accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          summary: updates.summary,
+          description: updates.description,
+          start: updates.start,
+          end: updates.end,
+          location: updates.location
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Calendar update event error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return this.transformCalendarEvents([data])[0];
+    } catch (error) {
+      console.error('Error updating calendar event:', error);
+      return null;
+    }
+  }
+}
+```
+
+### Step 12: Deploying to Cloudflare Workers
+
+Deploy your MCP server:
+
+```bash
+# Deploy to Cloudflare Workers
+npm run deploy
+```
+
+After deployment, your MCP server will be available at:
+`https://your-worker-name.your-subdomain.workers.dev`
+
+## 🚀 Final Steps
+
+1. **Upload your environment variables to Cloudflare**:
+   ```bash
+   wrangler secret bulk .dev.vars
+   ```
+
+2. **Test your MCP server** by connecting it to an MCP-compatible AI assistant
+
+
+## 📚 Additional Resources
+
+- [Cloudflare Workers Documentation](https://developers.cloudflare.com/workers/)
+- [MCP Protocol Specification](https://modelcontextprotocol.github.io/)
+- [Google Calendar API Documentation](https://developers.google.com/calendar)
+
+
+## 🧪 Testing with Claude
+
+Once deployed, you can test your MCP server with Claude:
+
+### Example Conversations
+
+**Flight Search:**
+```
+Find flights from JFK to LHR departing December 15th
+```
+
+**Travel Planning:**
+```
+Create a travel plan for Paris and London, December 15-22, budget $3000
+```
+
+**Calendar Integration:**
+```
+Check if I have any conflicts for my December 15-22 trip
+```
+
+## 🛠️ Troubleshooting
+
+### Common Issues
+
+**"Tool not found" errors:**
+- Check tool registration in `src/tools/index.ts`
+- Verify tool names match exactly
+- Ensure all imports are correct
+
+**API key errors:**
+- Verify `.dev.vars` file has correct keys
+- Check API key format and permissions
+- Test API keys directly with curl
+
+**TypeScript errors:**
+- Run `npm run type-check` to identify issues
+- Ensure all imports have correct file extensions
+- Check Zod schema definitions match usage
+
+**Deployment issues:**
+- Verify `wrangler.jsonc` configuration
+- Check Cloudflare account permissions
+- Ensure environment variables are set in Cloudflare dashboard
+
+**🎉 Congratulations!** You've built a complete MCP server that enables Claude to search flights, manage travel plans, and coordinate bookings. Your server demonstrates the power of the Model Context Protocol for creating AI-native integrations.
