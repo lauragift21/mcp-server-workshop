@@ -26,7 +26,7 @@ We'll vote and build **one live** during the workshop—but you can explore and 
 
 - ✈️ [**Real-time Travel Planner**](./use-cases/travel-planner/) – Claude integrates with your calendar & travel APIs to plan trips
 - 🍽 [**Restaurant Reservation**](./use-cases/restaurant-reservation/) – Claude connects to a booking platform like Yelp or OpenTable
-- 📝 [**AI-Powered Meeting Summary**](./use-cases/meeting-summary/) – Claude summarizes notes and creates Jira tasks from Google Docs
+- 📝 [**AI-Powered Meeting Summary**](./use-cases/meeting-summary/) – Claude summarizes notes and creates Jira tasks from Google Docs or document file
 
 ---
 
