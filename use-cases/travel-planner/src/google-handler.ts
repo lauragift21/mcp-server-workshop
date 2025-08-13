@@ -53,7 +53,7 @@ async function redirectToGoogle(
 				clientId: c.env.GOOGLE_CLIENT_ID,
 				hostedDomain: c.env.HOSTED_DOMAIN,
 				redirectUri: new URL("/callback", c.req.raw.url).href,
-				scope: "email profile",
+				scope: ["email", "profile", "https://www.googleapis.com/auth/calendar.readonly"].join(" "),
 				state: btoa(JSON.stringify(oauthReqInfo)),
 				upstreamUrl: "https://accounts.google.com/o/oauth2/v2/auth",
 			}),
