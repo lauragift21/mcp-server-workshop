@@ -13,17 +13,22 @@ export function registerJiraTools(server: McpServer) {
   const summarizerService = new DocumentSummarizer()
 
   const getJiraService = (): JiraService => {
-    const jiraConfig = {
-      baseUrl: env.JIRA_BASE_URL || '',
-      email: env.JIRA_EMAIL || '',
-      apiToken: env.JIRA_API_TOKEN || '',
-    }
+    try {
+      const jiraConfig = {
+        baseUrl: env.JIRA_BASE_URL || '',
+        email: env.JIRA_EMAIL || '',
+        apiToken: env.JIRA_API_TOKEN || '',
+      }
 
-    if (!jiraConfig.baseUrl || !jiraConfig.email || !jiraConfig.apiToken) {
-      throw new Error('Jira configuration is incomplete. Please provide jiraBaseUrl, email, and jiraApiToken in the Props.')
-    }
+      if (!jiraConfig.baseUrl || !jiraConfig.email || !jiraConfig.apiToken) {
+        throw new Error('Jira configuration is incomplete. Please set JIRA_BASE_URL, JIRA_EMAIL, and JIRA_API_TOKEN environment variables.')
+      }
 
-    return new JiraService(jiraConfig)
+      return new JiraService(jiraConfig)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown Jira configuration error'
+      throw new Error(`Failed to initialize Jira service: ${message}`)
+    }
   }
 
   // Tool to create Jira task from document summary

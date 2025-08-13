@@ -3,11 +3,9 @@
  */
 
 export type Props = {
-  name: string
-  email: string
-  googleApiKey: string
-  jiraApiToken?: string
-  jiraBaseUrl?: string
+  // Note: Props are not currently used in local file processing approach
+  // Environment variables are accessed directly via 'cloudflare:workers' env
+  // Keeping minimal structure for MCP agent compatibility
 }
 
 export interface DocumentContent {

@@ -5,11 +5,7 @@
  * Users can upload text files or provide text content directly for summarization.
  */
 
-export interface DocumentContent {
-  title: string
-  content: string
-  wordCount: number
-}
+import { DocumentContent } from '../types'
 
 export class LocalFileService {
   constructor() {

@@ -1,5 +1,5 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
-import { registerDocumentTools } from './google-docs'
+import { registerDocumentTools } from './local-file'
 import { registerJiraTools } from './jira'
 
 /**
