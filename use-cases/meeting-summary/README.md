@@ -1,4 +1,4 @@
-# Meeting Summary MCP Server
+# AI Powered Meeting Summary MCP Server
 
 An MCP server for intelligent document summarization and Jira task creation, featuring **dual-mode AI integration** with Cloudflare Workers AI and advanced extractive fallback. Designed to work seamlessly with Claude and other AI assistants.
 
